@@ -1,0 +1,38 @@
+{
+    "driver_id": "sonyadcp",
+    "version": "1.0.0",
+    "release_date": "2025-04-05",
+    "min_core_api": "0.25.0",
+    "name": { 
+        "en": "Sony Projector (ADCP)",
+        "de": "Sony Projektor (ADCP)"
+      },
+    "icon": "uc:projector",
+    "description": {
+        "en": "Integration to control Sony projectors that support the ADCP protocol.",
+        "de": "Integration zum Steuern von Sony Projektoren, die das ADCP-Protokoll unterstützen."
+      },
+    "port": 9081,
+    "developer": {
+        "name": "kennymc.c",
+        "url": "https://github.com/kennymc-c/ucr-integration-sonyADCP"
+      },
+    "home_page": "https://github.com/kennymc-c/ucr-integration-sonyADCP",
+    "setup_data_schema": {
+      "title": {
+        "en": "Setup",
+        "de": "Einrichtung"
+      },
+      "settings": [
+      {
+        "id": "note",
+        "label": {"en": "⚠️ Important Notes", "de": "⚠️ Wichtige Hinweise"},
+        "field": { "label": { "value": {
+          "en": "You need to either assign a **static ip address** to your projector or configure your router's dhcp server to always assign the same ip address to the projector. \n\nOn most models ADCP and Advertisement (SDAP) is already turned on by default. Please refer to Sony's user manual on how to turn on these services manually as there are different variants of the WebUI depending on the model you are using. \n\nTo access the WebUI of the projector and turn on the projector remotely you may also need to enable the WebUI and network management in the projector's settings first.",
+          "de": "Du musst deinem Projektor entweder eine **statische IP-Adresse** zuweisen oder den DHCP-Server deines Routers so konfigurieren, dass er dem Projektor immer die gleiche IP-Adresse zuweist. \n\nBei den meisten Modellen sind ADCP und Advertisement (SDAP) standardmäßig schon aktiviert. Bitte gucke im Sony-Benutzerhandbuch nach, wie du diese Dienste manuell aktivieren kannst, da es je nach Modell unterschiedliche Varianten der WebUI gibt. \n\nUm auf die WebUI des Projektors zuzugreifen und den Projektor aus der Ferne einzuschalten, musst du möglicherweise zuerst die WebUI und das Netzwerkmanagement in den Einstellungen des Projektors aktivieren."
+          } }
+        }
+      }
+      ]
+    }
+}
