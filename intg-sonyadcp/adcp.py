@@ -16,15 +16,16 @@ _LOG = logging.getLogger(__name__)
 
 #These are just a fraction of available ADCP commands. For a full list of supported commands refer to the external links at README.md/#ADCP-supported-commands-list
 
+#TODD Add a protocol main class with get method that returns the string with .value added to ENUM
 class Get (str, Enum):
-    """This class is used to define commands that return a value from the projector"""
+    """This class is used to define commands that return a query value from the projector"""
 
     POWER = "power_status ?"
     INPUT = "input ?"
     MUTE = "blank ?"
     COLOR_SPACE = "color_space ?"
     MODE_2D_3D = "3d_status ?"
-    #Response only:
+    #Query value only commands:
     SIGNAL = "signal ?"
     TIMER = "timer ?"
     TEMPERATURE = "temperature ?"
@@ -32,7 +33,7 @@ class Get (str, Enum):
     ERROR = "error ?"
     MODEL = "modelname ?"
     SERIAL = "serialnum ?"
-    MAC = "\"mac_address ? \""
+    MAC = "mac_address ?"
 
 class Commands (str, Enum):
     """This class is used to define commands that can be send the projector"""
@@ -42,7 +43,8 @@ class Commands (str, Enum):
     POWER_OFF = "power \"off\""
     INPUT = "input"
     PICTURE_MODE = "picture_mode"
-    PICTURE_POSITION = "pic_pos_sel"
+    PICTURE_POSITION_SELECT = "pic_pos_sel"
+    PICTURE_POSITION_SAVE = "pic_pos_save"
     ASPECT = "aspect"
     MOTIONFLOW = "motionflow"
     HDR = "hdr"
@@ -245,6 +247,9 @@ class Responses():
 
 class Projector:
     """This class is used to define the projector object and its methods"""
+
+
+
     def __init__(self, ip: str = None, sdap_port: int = 53862, adcp_port: int = 53595, adcp_timeout: int = 5, adcp_password: str = "Projector"):
         """
         :param ip: str, IP address for projector. Can be empty when using get_pjinfo
@@ -262,63 +267,97 @@ class Projector:
         self.sdap_port = sdap_port
         self.sdap_timeout = 31 #30 sec is the default SDAP advertisement interval
 
+
+
     async def get_pjinfo(self):
         """
-        Returns ip, serial, and model name from the projector via SDAP advertisement service as a dictionary.
+        Returns a list of dictionaries containing ip, serial, and model name from projectors
+        via the SDAP advertisement service.
 
         Can take up to 30 seconds when using the default SDAP advertisement interval.
         """
         try:
-            # Socket Setup
             sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             sock.bind(("", self.sdap_port))
             sock.settimeout(self.sdap_timeout)
 
-            # Receive Data
             def receive_data():
                 return sock.recvfrom(1028)  # Blocking call to receive data and address
 
-            try:
-                sdap_buffer, addr = await asyncio.to_thread(receive_data)
-                if not sdap_buffer or len(sdap_buffer) < 24:
-                    _LOG.error("Invalid or empty data received")
-                    return None
+            devices = []  # List to store unique devices
+            seen_devices = set()  # Set to track unique devices based on their serial and IP
+            start_time = asyncio.get_event_loop().time()
+            timeout = self.sdap_timeout
 
-                # Parse Data
-                serial = unpack(">I", sdap_buffer[20:24])[0]
-                model_bytes = sdap_buffer[8:20].strip(b"\x00")
-                if not model_bytes:
-                    _LOG.error("Empty model data")
-                    return None
+            while True:
+                elapsed_time = asyncio.get_event_loop().time() - start_time
+                remaining_time = timeout - elapsed_time
 
-                model = model_bytes.decode("ascii", errors="ignore")
-                ip = addr[0]
+                if remaining_time <= 0:
+                    _LOG.info("SDAP timeout reached. Stopping device discovery.")
+                    break
 
-                if not all([serial, model, ip]):
-                    _LOG.error(f"Invalid data: serial={serial}, model={model}, ip={ip}")
-                    return None
+                try:
+                    sdap_buffer, addr = await asyncio.wait_for(
+                        asyncio.to_thread(receive_data), timeout=remaining_time
+                    )
+                    if not sdap_buffer or len(sdap_buffer) < 24:
+                        _LOG.warning("Invalid or empty data received")
+                        continue
 
-                return {"model": model, "serial": serial, "ip": ip}
+                    # Parse Data
+                    serial = unpack(">I", sdap_buffer[20:24])[0]
+                    model_bytes = sdap_buffer[8:20].strip(b"\x00")
+                    if not model_bytes:
+                        _LOG.warning("Empty model data")
+                        continue
 
-            except socket.timeout as t:
-                _LOG.error("SDAP timeout waiting for projector advertisement")
-                raise TimeoutError("No projector response within timeout") from t
+                    model = model_bytes.decode("ascii", errors="ignore")
+                    ip = addr[0]
 
-            except (UnicodeDecodeError, IndexError) as e:
-                _LOG.error(f"Failed to parse projector data: {e}")
-                return None
+                    if not all([serial, model, ip]):
+                        _LOG.warning(f"Invalid data: serial={serial}, model={model}, ip={ip}")
+                        continue
+
+                    # Check for duplicates using a unique identifier
+                    device_identifier = (serial, ip)
+                    if device_identifier in seen_devices:
+                        _LOG.debug(f"Duplicate device ignored: {device_identifier}")
+                        continue
+
+                    # Add the device to the list and mark it as seen
+                    device_data = {"model": model, "serial": serial, "ip": ip}
+                    devices.append(device_data)
+                    seen_devices.add(device_identifier)
+                    _LOG.info(f"Discovered device: {device_data}")
+
+                except asyncio.TimeoutError:
+                    _LOG.info("SDAP timeout reached. Stopping device discovery.")
+                    break
+
+                except (UnicodeDecodeError, IndexError) as e:
+                    _LOG.warning(f"Failed to parse projector data: {e}")
+                    continue
+
+            return devices if devices else None
 
         except Exception as e:
-            _LOG.error(f"SDAP communication error: {str(e)}")
-            return None
+            raise Exception(f"SDAP communication error: {str(e)}") from e
+
         finally:
             try:
                 sock.close()
             except Exception:
                 pass
 
+
+
     async def command(self, command):
         """Send an ADCP command to the projector and return the response using async socket connection"""
+
+        #Needed as get_pjinfo works without an ip
+        if self.ip is None:
+            raise ValueError("No ip address has been ")
 
         if isinstance(command, Enum):
             command = command.value

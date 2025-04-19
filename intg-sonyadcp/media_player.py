@@ -28,18 +28,12 @@ async def mp_cmd_handler(entity: ucapi.MediaPlayer, cmd_id: str, _params: dict[s
     """
 
     try:
-        ip = config.Setup.get("ip")
-    except ValueError as v:
-        _LOG.error(v)
-        return ucapi.StatusCodes.SERVER_ERROR
-
-    try:
         if not _params:
             _LOG.info(f"Received {cmd_id} command for {entity.id}")
-            await projector.send_cmd(entity.id, ip, cmd_id)
+            await projector.send_cmd(entity.id, cmd_id)
         else:
             _LOG.info(f"Received {cmd_id} command with parameter {_params} for {entity.id}")
-            await projector.send_cmd(entity.id, ip, cmd_id, _params)
+            await projector.send_cmd(entity.id, cmd_id, _params)
     except TimeoutError:
         return ucapi.StatusCodes.TIMEOUT
     except PermissionError:
@@ -57,49 +51,31 @@ async def mp_cmd_handler(entity: ucapi.MediaPlayer, cmd_id: str, _params: dict[s
 
 
 
-async def add_mp(ent_id: str, name: str):
+async def add_mp(device_id: str):
     """Function to add a media player entity with the config.MpDef class definition"""
 
-    _LOG.info("Add projector media player entity with id " + ent_id + " and name " + name)
+    mp_name = config.Devices.get(device_id=device_id, key="name")
+    mp_id= device_id
 
-    definition = ucapi.MediaPlayer(
-        ent_id,
-        name,
-        features=config.MpDef.features,
-        attributes=config.MpDef.attributes,
-        device_class=config.MpDef.device_class,
-        options=config.MpDef.options,
-        cmd_handler=mp_cmd_handler
-    )
-
-    _LOG.debug("Projector media player entity definition created")
+    definition = config.MediaPlayer().get_def(ent_id=mp_id, name=mp_name)
 
     driver.api.available_entities.add(definition)
 
-    _LOG.info("Added projector media player entity")
+    _LOG.info(f"Added projector media player entity with id {mp_id} and name {mp_name} as available entity")
 
 
 
-async def remove_mp(ent_id: str, name: str):
-    """Function to add a media player entity with the config.MpDef class definition"""
+async def remove_mp(device_id: str):
+    """Function to remove a media player entity with the config.MpDef class definition"""
 
-    _LOG.info("Add projector media player entity with id " + ent_id + " and name " + name)
+    mp_name = config.Devices.get(device_id=device_id, key="name")
+    mp_id= device_id
 
-    definition = ucapi.MediaPlayer(
-        ent_id,
-        name,
-        features=config.MpDef.features,
-        attributes=config.MpDef.attributes,
-        device_class=config.MpDef.device_class,
-        options=config.MpDef.options,
-        cmd_handler=mp_cmd_handler
-    )
+    definition = config.MediaPlayer().get_def(ent_id=mp_id, name=mp_name)
 
-    _LOG.debug("Projector media player entity definition created")
+    driver.api.available_entities.add(definition)
 
-    driver.api.configured_entities.remove(definition)
-
-    _LOG.info("Added projector media player entity as available entity")
+    _LOG.info(f"Removed projector media player entity with id {mp_id} and name {mp_name} as available entity")
 
 
 
@@ -107,50 +83,66 @@ class MpPollerController:
     """Creates a task to regularly poll power/mute/input attributes from the projector"""
 
     @staticmethod
-    async def start(ent_id: str, ip: str):
+    async def start(device_id: str):
         """Starts the mp_poller task. If the task is already running it will be stopped and restarted"""
-        mp_poller_interval = config.Setup.get("mp_poller_interval")
+
+        name = device_id + "-mp_poller"
+        mp_poller_interval = config.Devices.get(device_id=device_id, key="mp_poller_interval")
+        if mp_poller_interval is None:
+            mp_poller_interval = config.Setup.get("default_mp_poller_interval")
+
         if mp_poller_interval == 0:
-            _LOG.debug("Power/mute/input poller interval set to " + str(mp_poller_interval))
+            _LOG.debug("Power/mute/input hours poller interval set to " + str(mp_poller_interval))
             try:
-                poller_task, = [task for task in driver.asyncio.all_tasks() if task.get_name() == "mp_poller"]
+                poller_task, = [task for task in driver.asyncio.all_tasks() if task.get_name() == name]
                 poller_task.cancel()
                 try:
                     await poller_task
                 except driver.asyncio.CancelledError:
-                    _LOG.info("Stopped running power/mute/input poller task")
+                    _LOG.info(f"Stopped running power/mute/input poller task \"{name}\"")
             except ValueError:
-                _LOG.info("The power/mute/input poller task will not be started")
+                _LOG.info(f"The power/mute/input poller task for device_id \"{device_id}\" will not be started")
         else:
             try:
-                poller_task, = [task for task in driver.asyncio.all_tasks() if task.get_name() == "mp_poller"]
+                poller_task, = [task for task in driver.asyncio.all_tasks() if task.get_name() == name]
                 poller_task.cancel()
                 try:
                     await poller_task
                 except driver.asyncio.CancelledError:
-                    driver.loop.create_task(mp_poller(ent_id, mp_poller_interval, ip), name="mp_poller")
-                    _LOG.info("Restarted power/mute/input poller task with an interval of " + str(mp_poller_interval) + " seconds")
+                    driver.loop.create_task(mp_poller(device_id, mp_poller_interval), name=name)
+                    _LOG.info(f"Restarted power/mute/input poller task \"{name}\" with an interval of {str(mp_poller_interval)} seconds")
             except ValueError:
-                driver.loop.create_task(mp_poller(ent_id, mp_poller_interval, ip), name="mp_poller")
-                _LOG.info("Started power/mute/input poller task with an interval of " + str(mp_poller_interval) + " seconds")
+                driver.loop.create_task(mp_poller(device_id, mp_poller_interval), name=name)
+                _LOG.info(f"Started power/mute/input poller task \"{name}\" with an interval of {str(mp_poller_interval)} seconds")
 
     @staticmethod
-    async def stop():
-        """Stops the mp_poller task"""
-        try:
-            poller_task, = [task for task in driver.asyncio.all_tasks() if task.get_name() == "mp_poller"]
-            poller_task.cancel()
+    async def stop(device_id:str = None):
+        """Stops the mp_poller task for the given device_id"""
+
+        async def stop_task(name):
             try:
-                await poller_task
-            except driver.asyncio.CancelledError:
-                _LOG.debug("Stopped power/mute/input poller task")
-        except ValueError:
-            _LOG.debug("Power/mute/input poller task is not running or will not be stopped as the media player entity has been removed \
-or not (yet) added as a configured entity on the remote")
+                poller_task, = [task for task in driver.asyncio.all_tasks() if task.get_name() == name]
+                poller_task.cancel()
+                try:
+                    await poller_task
+                except driver.asyncio.CancelledError:
+                    _LOG.debug(f"Stopped power/mute/input poller task \"{name}\"")
+            except ValueError:
+                if device_id is not None:
+                    _LOG.debug(f"There is no running power/mute/input poller task named \"{name}\"")
+
+        if device_id is None:
+            _LOG.debug("No device_id provided. Stopping all mp poller tasks")
+            for device in config.Devices.list():
+                name = str(device) + "-mp_poller"
+                await stop_task(name)
+        else:
+            name = device_id + "-mp_poller"
+            await stop_task(name)
 
 
 
-async def mp_poller(entity_id: str, interval: int, ip: str) -> None:
+async def mp_poller(device_id: str, interval: int) -> None:
     """Projector attributes poller task"""
     while True:
         await driver.asyncio.sleep(interval)
@@ -158,24 +150,24 @@ async def mp_poller(entity_id: str, interval: int, ip: str) -> None:
             continue
         try:
             #TODO Implement check if there are too many timeouts/connection errors to the projector and automatically deactivate poller and set entity status to unknown
-            await update_mp(entity_id, ip)
+            await update_mp(device_id)
         except Exception as e:
             _LOG.error(e)
             continue
 
 
 
-async def update_mp(entity_id: str, ip: str):
+async def update_mp(device_id: str):
     """Retrieve input source, power status and muted status from the projector, compare them with the known status on the remote and update them if necessary"""
 
     try:
-        _LOG.debug("Checking power/mute/input status for media player attributes poller task")
-        power = await projector.get_attr_power(ip)
-        muted = await projector.get_attr_muted(ip)
-        source = await projector.get_attr_source(ip)
+        _LOG.debug(f"Checking power/mute/input status for media player attributes poller task for {device_id}")
+        power = await projector.get_attr_power(device_id)
+        muted = await projector.get_attr_muted(device_id)
+        source = await projector.get_attr_source(device_id)
     except Exception as e:
         power = {ucapi.remote.Attributes.STATE: ucapi.remote.States.UNAVAILABLE}
-        raise Exception(f"Could not check projector power/mute/input state: {e}") from e
+        raise Exception(f"Could not check power/mute/input state for {device_id}: {e}") from e
 
     try:
         stored_states = await driver.api.available_entities.get_states()
@@ -201,7 +193,7 @@ async def update_mp(entity_id: str, ip: str):
             attributes_to_skip.append(attribute)
 
     if not attributes_to_skip:
-        _LOG.debug("Entity attributes for " + str(attributes_to_skip) + " have not changed since the last update")
+        _LOG.debug(f"Entity attributes for {str(attributes_to_skip)} on {device_id} have not changed since the last update")
 
     if not attributes_to_update:
         attributes_to_send = {}
@@ -213,14 +205,14 @@ async def update_mp(entity_id: str, ip: str):
             attributes_to_send.update({ucapi.media_player.Attributes.SOURCE: source})
 
         try:
-            api_update_attributes = driver.api.configured_entities.update_attributes(entity_id, attributes_to_send)
+            api_update_attributes = driver.api.configured_entities.update_attributes(device_id, attributes_to_send)
         except Exception as e:
-            raise Exception("Error while updating attributes for entity id " + entity_id) from e
+            raise Exception("Error while updating attributes for entity id " + device_id) from e
 
         if not api_update_attributes:
-            raise Exception("Entity " + entity_id + " not found. Please make sure it's added as a configured entity on the remote")
+            raise Exception("Entity " + device_id + " not found. Please make sure it's added as a configured entity on the remote")
         else:
-            _LOG.info("Updated entity attribute(s) " + str(attributes_to_update) + " for " + entity_id)
+            _LOG.info(f"Updated entity attribute(s) {str(attributes_to_update)} for {device_id}")
 
     else:
-        _LOG.debug("No projector attributes to update. Skipping update process")
+        _LOG.debug(f"No projector attributes for {device_id} to update. Skipping update process")

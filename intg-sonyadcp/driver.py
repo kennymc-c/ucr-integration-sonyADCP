@@ -6,7 +6,6 @@ import sys
 import os
 import asyncio
 import logging
-import re
 
 import ucapi
 
@@ -29,39 +28,41 @@ async def startcheck():
     """
     try:
         config.Setup.load()
+        config.Devices.load()
     except (OSError, Exception) as e:
         _LOG.critical(e)
         _LOG.critical("Stopping integration driver")
         raise SystemExit(0) from e
 
     if config.Setup.get("setup_complete"):
-        try:
-            mp_entity_id = config.Setup.get("id")
-            mp_entity_name = config.Setup.get("name")
-            rt_entity_id = "remote-"+mp_entity_id
-            config.Setup.set("rt-id", rt_entity_id)
-            rt_entity_name = mp_entity_name
-            config.Setup.set_lt_name_id(mp_entity_id, mp_entity_name)
-            lt_entity_id = config.Setup.get("lt-id")
-            lt_entity_name = config.Setup.get("lt-name")
-        except ValueError as v:
-            _LOG.error(v)
+        for device_id in config.Devices.list():
+            try:
+                mp_entity_id = device_id
+                rt_entity_id = mp_entity_id
+                lt_entity_id = config.Devices.get(device_id=device_id, key="lt-id")
+            except ValueError as v:
+                _LOG.error(v)
 
-        #Add all entities as available entities
-        if api.available_entities.contains(mp_entity_id):
-            _LOG.debug("Projector media player entity with id " + mp_entity_id + " is already in storage as available entity")
-        else:
-            await media_player.add_mp(mp_entity_id, mp_entity_name)
+            #Add all entities as available entities
+            if api.available_entities.contains(mp_entity_id):
+                _LOG.debug("Projector media player entity with id " + mp_entity_id + " is already in storage as available entity")
+            else:
+                await media_player.add_mp(device_id)
 
-        if api.available_entities.contains(rt_entity_id):
-            _LOG.debug("Projector remote entity with id " + rt_entity_id + " is already in storage as available entity")
-        else:
-            await remote.add_remote(rt_entity_id, rt_entity_name)
+            if api.available_entities.contains(rt_entity_id):
+                _LOG.debug("Projector remote entity with id " + rt_entity_id + " is already in storage as available entity")
+            else:
+                await remote.add_remote(device_id)
 
-        if api.available_entities.contains(lt_entity_id):
-            _LOG.debug("Projector light source timer sensor entity with id " + lt_entity_id + " is already in storage as available entity")
+            if api.available_entities.contains(lt_entity_id):
+                _LOG.debug("Projector light source timer sensor entity with id " + lt_entity_id + " is already in storage as available entity")
+            else:
+                await sensor.add_lt_sensor(device_id)
+    else:
+        if len(config.Devices.list()) < 1:
+            _LOG.info("First time setup was not completed. Please restart the setup process")
         else:
-            await sensor.add_lt_sensor(lt_entity_id, lt_entity_name)
+            _LOG.info("Please start the driver setup process")
 
 
 
@@ -129,22 +130,29 @@ async def on_subscribe_entities(entity_ids: list[str]) -> None:
     _LOG.info("Received subscribe entities event for entity ids: " + str(entity_ids))
 
     config.Setup.set("standby", False)
-    ip = config.Setup.get("ip")
-    mp_entity_id = config.Setup.get("id")
-    rt_entity_id = config.Setup.get("rt-id")
-    lt_entity_id = config.Setup.get("lt-id")
 
     if config.Setup.get("setup_complete"):
         for entity_id in entity_ids:
+            device_id = None
+            mp_entity_id = None
+            rt_entity_id = None
+            lt_entity_id = None
+
+            if entity_id in config.Devices.list():
+                device_id = config.Devices.get(device_id=entity_id, key="device_id")
+                mp_entity_id = device_id
+                rt_entity_id = config.Devices.get(device_id=entity_id, key="rt-id")
+                lt_entity_id = config.Devices.get(device_id=device_id, key="lt-id")
+
             try:
-                if entity_id == mp_entity_id:
-                    await media_player.update_mp(entity_id, ip)
-                    await media_player.MpPollerController.start(entity_id, ip)
-                if entity_id == lt_entity_id:
-                    await sensor.update_lt(entity_id, ip)
-                    await sensor.LtPollerController.start(entity_id, ip)
-                if entity_id == rt_entity_id:
-                    await remote.update_rt(rt_entity_id, ip)
+                if mp_entity_id and entity_id == mp_entity_id:
+                    await media_player.update_mp(device_id)
+                    await media_player.MpPollerController.start(device_id)
+                if lt_entity_id and entity_id == lt_entity_id:
+                    await sensor.update_lt(device_id)
+                    await sensor.LtPollerController.start(device_id)
+                if rt_entity_id and entity_id == rt_entity_id:
+                    await remote.update_rt(device_id)
             except OSError as o:
                 _LOG.critical(o)
             except Exception as e:
@@ -157,7 +165,8 @@ async def on_subscribe_entities(entity_ids: list[str]) -> None:
 
 
 
-#BUG No event when removing an entity as configured entity. Could be a UC Python library bug
+#BUG No event when removing an entity as configured entity. Could be a UC Python library bug.
+# Therefore poller tasks will also be running for entities that have been removed as configured entities.
 @api.listens_to(ucapi.Events.UNSUBSCRIBE_ENTITIES)
 async def on_unsubscribe_entities(entity_ids: list[str]) -> None:
     """
@@ -168,14 +177,16 @@ async def on_unsubscribe_entities(entity_ids: list[str]) -> None:
     _LOG.info("Received unsubscribe entities event for entity ids: " + str(entity_ids))
 
     config.Setup.set("standby", False)
-    mp_entity_id = config.Setup.get("id")
-    lt_entity_id = config.Setup.get("lt-id")
 
-    if mp_entity_id in entity_ids:
-        await media_player.MpPollerController.stop()
+    for entity_id in entity_ids:
+        mp_entity_id= config.Devices.get(device_id=entity_id, key="id")
+        lt_entity_id = config.Devices.get(device_id=entity_id, key="lt-id")
 
-    if lt_entity_id in entity_ids:
-        await sensor.LtPollerController.stop()
+        if mp_entity_id in entity_ids:
+            await media_player.MpPollerController.stop(device_id=entity_id)
+
+        if lt_entity_id in entity_ids:
+            await sensor.LtPollerController.stop(device_id=entity_id)
 
 
 
@@ -216,7 +227,7 @@ async def main():
 
         _LOG.info("Deactivating power/mute/input poller to reduce battery consumption when running on the remote")
         _LOG.info("The poller task may still be activated afterwards if a custom interval has been set in the manual advanced setup")
-        config.Setup.set("mp_poller_interval", 0, False) #Using False to prevent the config file from being created before first time setup
+        config.Setup.set("default_mp_poller_interval", 0, False) #Using False to prevent the config file from being created before first time setup
     else:
         logging.basicConfig(format="%(asctime)s.%(msecs)03d | %(levelname)-8s | %(name)-14s | %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
         setup_logger()
@@ -229,5 +240,8 @@ async def main():
 
 
 if __name__ == "__main__":
-    loop.run_until_complete(main())
-    loop.run_forever()
+    try:
+        loop.run_until_complete(main())
+        loop.run_forever()
+    except KeyboardInterrupt:
+        pass

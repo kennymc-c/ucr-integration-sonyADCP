@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-"""Module that includes functions to execute pySDCP commands"""
+"""Module that includes functions to execute ADCP and SDAP commands"""
 
 import logging
 import json
@@ -16,23 +16,21 @@ _LOG = logging.getLogger(__name__)
 
 
 
-def projector_def(ip:str = ""):
-    """Create the projector object. Use custom ports and password if they differ from the projectors default values"""
-    adcp_port = config.Setup.get("adcp_port")
-    adcp_password = config.Setup.get("adcp_password")
-    adcp_timeout = config.Setup.get("adcp_timeout")
-    sdap_port = config.Setup.get("sdap_port")
+def projector_def(device_id:str = None):
+    """Create the projector object. Use custom ports and password if they differ from the projectors default values
+    
+    :device_id: The id of the device in config.Devices. If empty the temp device id from config.Setup will be used e.g. during setup
+    """
 
-    if ip == "":
-        ip = None
-    if adcp_password == "Projector":
-        adcp_password = ""
-    if adcp_port == 53595:
-        adcp_port = None
-    if adcp_timeout == 5:
-        adcp_timeout = None
-    if sdap_port == 53862:
-        sdap_port = None
+    if device_id is None:
+        #Using temp device id for projector object definition during setup
+        device_id = config.Setup.get("setup_temp_device")
+
+    ip = config.Devices.get(device_id=device_id, key="ip")
+    adcp_password = config.Devices.get(device_id=device_id, key="adcp_password")
+    adcp_port = config.Devices.get(device_id=device_id, key="adcp_port")
+    adcp_timeout = config.Devices.get(device_id=device_id, key="adcp_timeout")
+    sdap_port = config.Devices.get(device_id=device_id, key="sdap_port")
 
     attr = {"ip": ip, "adcp_port": adcp_port, "sdap_port": sdap_port, "adcp_password": adcp_password, "adcp_timeout": adcp_timeout}
 
@@ -43,10 +41,17 @@ def projector_def(ip:str = ""):
 
 
 
-async def get_light_source_hours(ip: str):
+async def get_light_source_hours(device_id: str = None):
     """Get the light source hours from the projector"""
+
+    if device_id is None:
+        #If no device_id is provided a temp device will be used instead
+        device_id = config.Setup.get("setup_temp_device")
+
+    _LOG.debug(f"Get light source hours for {device_id}")
+
     try:
-        response = await projector_def(ip).command(ADCP.Get.TIMER)
+        response = await projector_def(device_id).command(ADCP.Get.TIMER)
         if response:
             try:
                 hours_data = json.loads(response)
@@ -62,11 +67,14 @@ async def get_light_source_hours(ip: str):
         _LOG.error(e)
         raise type(e) from e
 
-async def get_attr_power(ip: str):
+
+
+async def get_attr_power(device_id: str):
     """Get the current power status from the projector and return the corresponding ucapi power status attribute"""
-    _LOG.debug("Get current power status")
+
+    _LOG.debug(f"Get current power status for {device_id}")
     try:
-        power_state = await projector_def(ip).command(ADCP.Get.POWER)
+        power_state = await projector_def(device_id).command(ADCP.Get.POWER)
     except Exception as e:
         raise type(e)(str(e)) from e
     if power_state in (ADCP.Values.States.STANDBY, ADCP.Values.States.COOLING1, ADCP.Values.States.COOLING1):
@@ -75,21 +83,27 @@ async def get_attr_power(ip: str):
     if power_state in (ADCP.Values.States.ON, ADCP.Values.States.STARTUP):
         return {ucapi.media_player.Attributes.STATE: ucapi.media_player.States.ON}
 
-async def get_attr_muted(ip: str):
+
+
+async def get_attr_muted(device_id: str):
     """Get the current muted status from the projector and return either False or True"""
-    _LOG.debug("Get mute state")
+
+    _LOG.debug(f"Get mute state for {device_id}")
     try:
-        if await projector_def(ip).command(ADCP.Get.MUTE) == ADCP.Values.States.ON:
+        if await projector_def(device_id).command(ADCP.Get.MUTE) == ADCP.Values.States.ON:
             return True
         return False
     except Exception as e:
         raise type(e)(str(e)) from e
 
-async def get_attr_source(ip: str):
+
+
+async def get_attr_source(device_id: str):
     """Get the current input source from the projector and return it as a string"""
-    _LOG.debug("Get current input")
+
+    _LOG.debug(f"Get current input for {device_id}")
     try:
-        if await projector_def(ip).command(ADCP.Get.INPUT) == ADCP.Values.Inputs.HDMI1:
+        if await projector_def(device_id).command(ADCP.Get.INPUT) == ADCP.Values.Inputs.HDMI1:
             return config.Sources.HDMI_1
         return config.Sources.HDMI_2
     except Exception as e:
@@ -97,10 +111,10 @@ async def get_attr_source(ip: str):
 
 
 
-async def send_cmd(entity_id: str, ip: str, cmd_name:str, params = None):
+async def send_cmd(device_id: str, cmd_name:str, params = None):
     """Send a command to the projector and raise an exception if it fails"""
 
-    projector_adcp = projector_def(ip)
+    projector_adcp = projector_def(device_id)
 
     if cmd_name == ucapi.media_player.Commands.SELECT_SOURCE:
         source = params["source"]
@@ -115,9 +129,9 @@ async def send_cmd(entity_id: str, ip: str, cmd_name:str, params = None):
         except Exception as e:
             raise type(e)(str(e))
 
-    if cmd_name in (ucapi.media_player.Commands.MUTE_TOGGLE, config.SimpleCommands.PICTURE_MUTING_TOGGLE):
+    elif cmd_name in (ucapi.media_player.Commands.MUTE_TOGGLE, config.SimpleCommands.PICTURE_MUTING_TOGGLE):
         try:
-            mute_state = await get_attr_muted(ip)
+            mute_state = await get_attr_muted(device_id)
         except Exception as e:
             raise type(e)(str(e))
 
@@ -153,49 +167,48 @@ async def send_cmd(entity_id: str, ip: str, cmd_name:str, params = None):
                 raise type(e)(str(e))
 
     try:
-        await update_attributes(entity_id, ip, cmd_name)
+        await update_attributes(device_id, cmd_name)
     except Exception as e:
         raise type(e)(str(e))
 
 
 
-async def update_attributes(entity_id:str , ip:str , cmd_name:str):
+async def update_attributes(device_id:str , cmd_name:str):
     """Update certain entity attributes and sensor values if the command changes these attributes"""
 
-    mp_id = config.Setup.get("id")
-    rt_id = config.Setup.get("rt-id")
-    lt_id = config.Setup.get("lt-id")
+    mp_id = device_id
+    rt_id = mp_id
 
     match cmd_name:
 
         case ucapi.media_player.Commands.ON:
             try:
-                driver.api.configured_entities.update_attributes(entity_id, {ucapi.media_player.Attributes.STATE: ucapi.media_player.States.ON})
+                driver.api.configured_entities.update_attributes(mp_id, {ucapi.media_player.Attributes.STATE: ucapi.media_player.States.ON})
                 driver.api.configured_entities.update_attributes(rt_id, {ucapi.remote.Attributes.STATE: ucapi.remote.States.ON})
-                sensor.update_lt(lt_id, ip)
+                sensor.update_lt(device_id)
             except Exception as e:
                 raise type(e)(str(e))
             _LOG.info("Media player power status attribute set to \"ON\"")
 
         case ucapi.media_player.Commands.OFF:
             try:
-                driver.api.configured_entities.update_attributes(entity_id, {ucapi.media_player.Attributes.STATE: ucapi.media_player.States.OFF})
+                driver.api.configured_entities.update_attributes(mp_id, {ucapi.media_player.Attributes.STATE: ucapi.media_player.States.OFF})
                 driver.api.configured_entities.update_attributes(rt_id, {ucapi.remote.Attributes.STATE: ucapi.remote.States.OFF})
-                sensor.update_lt(lt_id, ip)
+                sensor.update_lt(device_id)
             except Exception as e:
                 raise type(e)(str(e))
             _LOG.info("Media player power status attribute set to \"OFF\"")
 
         case ucapi.media_player.Commands.TOGGLE:
             try:
-                power_state = await get_attr_power(ip)
+                power_state = await get_attr_power(device_id)
             except Exception as e:
                 _LOG.error(e)
                 _LOG.warning("Couldn't get power state. Set to unknown")
-                driver.api.configured_entities.update_attributes(entity_id, {ucapi.media_player.Attributes.STATE: ucapi.media_player.States.UNKNOWN})
+                driver.api.configured_entities.update_attributes(mp_id, {ucapi.media_player.Attributes.STATE: ucapi.media_player.States.UNKNOWN})
                 driver.api.configured_entities.update_attributes(rt_id, {ucapi.remote.Attributes.STATE: ucapi.remote.States.UNKNOWN})
 
-            driver.api.configured_entities.update_attributes(entity_id, power_state)
+            driver.api.configured_entities.update_attributes(mp_id, power_state)
             driver.api.configured_entities.update_attributes(rt_id, power_state)
 
             _LOG.info(f"Media player and remote entity power status attribute set to \"{power_state}\"")
@@ -207,7 +220,7 @@ async def update_attributes(entity_id:str , ip:str , cmd_name:str):
             config.SimpleCommands.PICTURE_MUTING_TOGGLE:
 
             try:
-                mute_state = await get_attr_muted(ip)
+                mute_state = await get_attr_muted(device_id)
             except Exception as e:
                 raise type(e)(str(e))
 
@@ -227,7 +240,7 @@ async def update_attributes(entity_id:str , ip:str , cmd_name:str):
             config.SimpleCommands.INPUT_HDMI2:
 
             try:
-                source = await get_attr_source(ip)
+                source = await get_attr_source(device_id)
             except Exception as e:
                 raise type(e)(str(e))
 

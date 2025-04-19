@@ -14,10 +14,9 @@ Using [uc-integration-api](https://github.com/aitatoi/integration-python-library
 
 - [Usage](#usage)
   - [Supported models](#supported-models)
-  - [Limitations](#limitations)
   - [Projector Setup](#projector-setup)
+  - [ADCP Authentication](#adcp-authentication)
     - [Activate ADCP \& Advertisement (SDAP)](#activate-adcp--advertisement-sdap)
-    - [Change SDAP Interval (optional)](#change-sdap-interval-optional)
     - [Advanced settings](#advanced-settings)
 - [Entities](#entities)
 - [Commands \& attributes](#commands--attributes)
@@ -67,27 +66,25 @@ For a full list of all supported ADCP commands by your model see [ADCP Supported
 
 If your model is older or not supported you can try to use the deprecated [Sony SDCP integration](https://github.com/kennymc-c/ucr2-integration-sonySDCP)
 
-### Limitations
-
-This integration supports one projector per integration instance. You could run the integration multiple times using different und unique driver IDs.
-
 ### Projector Setup
 
 You need to either assign a static ip address to your projector or configure your router's dhcp server to always assign the same ip address to the projector. This is due to a technical limitation on how the SDAP advertisement protocol used by Sony projectors works.
 
 You may need to activate the WebUI and network management in the projector menu first to configure the following settings and be able to turn on the projector remotely.
 
+### ADCP Authentication
+
+Authentication for ADCP is enabled by default on most models. Therefore it's required to enter the WebUI password of the projector in the integration setup. Leave the field empty if you disabled authentication.
+
+**Important note: If you ever change the hostname of the device the integration is running on or use a configuration file that was created with on a different host, you need to reconfigure the projector in the integration setup.**
+
 #### Activate ADCP & Advertisement (SDAP)
 
 On most projectors ADCP and Advertisement via SDAP is turned on by default. Please refer to Sony's user manual on how to turn these services on manually as there are different variants of the projector WebUI depending on the model you are using.
 
-#### Change SDAP Interval (optional)
-
-During the initial setup the integration tries to query data from the projector via the SDAP advertisement protocol to generate a unique entity id and name. The default SDAP interval is 30 seconds. You can shorten the interval to a minimum value of 10 seconds in the WebUI of the projector.
-
 #### Advanced settings
 
-If you're using different ports for ADCP or SDAP advertisement than the default values, you need to activate the advanced settings option when configuring the integration. Here you can change the adcp port & password and the interval of both poller intervals.
+If you're using different ports for ADCP or SDAP advertisement than the default values, you need to activate the advanced settings option when configuring the integration. Here you can change the ADCP/SDAP ports & ADCP password and timeout as well as the interval of both poller intervals.
 
 Please note that when running this integration on the remote the power/mute/input poller interval is always set to 0 to deactivate this poller in order to reduce battery consumption and save cpu/memory usage.
 
@@ -103,7 +100,7 @@ Please note that when running this integration on the remote the power/mute/inpu
     - Hold just repeats the command continuously for the given hold time. There is no native hold function for the ADCP protocol as with some ir devices to activate additional functions
 - Sensor
   - Light source timer
-    - Light source hours will be updated every time the projector is powered on or off by the remote and automatically every 30 minutes (can be changed in config.py) while the projector is powered on and the remote is not in sleep/standby mode or the integration is disconnected
+    - Light source hours will be updated every time the projector is powered on or off by the remote and automatically every 30 minutes (can be changed in the advanced setup) while the projector is powered on and the remote is not in sleep/standby mode or the integration is disconnected
 
 ## Commands & attributes
 
@@ -134,7 +131,7 @@ Please note that when running this integration on the remote the power/mute/inpu
   - Cinema Film 1, Cinema Film 2, Reference, TV, Photo, Game, Bright Cinema, Bright TV, User
 - Aspect Ratios* ***
   - Normal, Squeeze, Stretch**, V Stretch, Zoom 1:85, Zoom 2:35
-- Picture Positions***
+- Picture Positions (Select and Save)***
   - 1,85, & 2,35***
   - Custom 1-3
   - Custom 4 & 5***
@@ -146,7 +143,7 @@ Please note that when running this integration on the remote the power/mute/inpu
   - High, Low
 - Laser Dimming* ***
   - Up, Down
-- Dynamic Iris/LIght Source Control * ***
+- Dynamic Iris/Light Source Control * ***
   - Off, Full, Limited
 - Motionflow*
   - Off, Smooth High, Smooth Low, Impulse\*\*\*, Combination\***, True Cinema
@@ -177,7 +174,7 @@ If a command can't be processed or applied by the projector this will result in 
 - Send command sequence
   - Simple command names have to be in upper case and separated by a comma
 
-You can also send native ADCP commands with the send command and send command sequence commands. This is useful for commands that are not available as simple commands or send a specific value. Please refer to the [ADCP supported commands list](#adcp-supported-commands-list) for a list of all commands for your projector model.
+You can also send native ADCP commands with the send command and send command sequence commands. This is useful for commands that are not available as simple commands or need a specific value. Please refer to the [ADCP supported commands list](#adcp-supported-commands-list) for a list of all commands for your projector model.
 
 ### Default remote entity button mappings
 
@@ -374,7 +371,7 @@ If your projector is not listed in the supported commands list please contact yo
 
 ## Planned improvements
 
-- Add a sensor and use media player title, artist and album from the media player to show signal infos (resolution, framerate, color space, 2D/3D status, light source output setting/value)
+- Add a sensor and use media player title, artist and album from the media player to show signal infos (resolution, framerate, color space, 2D/3D status, light source output setting/value, picture position)
 - Replace the light source timer sensor with a projector status sensor that also includes temperature, warning & error status
 - Add a simple command to trigger the update of sensor values and media player playback attributes as the integration itself and not the remote core are responsible for updating these data and frequent poller tasks are a battery killer. This command can e.g. be combined in a macro with the enter and return command of the media playback device.
 
