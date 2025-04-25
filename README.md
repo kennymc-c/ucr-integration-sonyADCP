@@ -15,9 +15,9 @@ Using [uc-integration-api](https://github.com/aitatoi/integration-python-library
 - [Usage](#usage)
   - [Supported models](#supported-models)
   - [Projector Setup](#projector-setup)
-  - [ADCP Authentication](#adcp-authentication)
+    - [ADCP Authentication](#adcp-authentication)
     - [Activate ADCP \& Advertisement (SDAP)](#activate-adcp--advertisement-sdap)
-    - [Advanced settings](#advanced-settings)
+  - [Advanced setup settings](#advanced-setup-settings)
 - [Entities](#entities)
 - [Commands \& attributes](#commands--attributes)
   - [Supported media player commands](#supported-media-player-commands)
@@ -72,7 +72,7 @@ You need to either assign a static ip address to your projector or configure you
 
 You may need to activate the WebUI and network management in the projector menu first to configure the following settings and be able to turn on the projector remotely.
 
-### ADCP Authentication
+#### ADCP Authentication
 
 Authentication for ADCP is enabled by default on most models. Therefore it's required to enter the WebUI password of the projector in the integration setup. Leave the field empty if you disabled authentication.
 
@@ -82,7 +82,7 @@ Authentication for ADCP is enabled by default on most models. Therefore it's req
 
 On most projectors ADCP and Advertisement via SDAP is turned on by default. Please refer to Sony's user manual on how to turn these services on manually as there are different variants of the projector WebUI depending on the model you are using.
 
-#### Advanced settings
+### Advanced setup settings
 
 If you're using different ports for ADCP or SDAP advertisement than the default values, you need to activate the advanced settings option when configuring the integration. Here you can change the ADCP/SDAP ports & ADCP password and timeout as well as the interval of both poller intervals.
 
