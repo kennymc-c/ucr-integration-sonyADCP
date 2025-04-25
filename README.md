@@ -60,7 +60,7 @@ Using [uc-integration-api](https://github.com/aitatoi/integration-python-library
 
 ### Supported models
 
-Most Sony home cinema projectors with an Ethernet RJ-45 port that were released since 2016 should support be supported. Please refer to Sony's user manual for more details.
+Most Sony home cinema projectors with an Ethernet RJ-45 port that were released since 2016 should be supported. Please refer to Sony's user manual for more details.
 
 For a full list of all supported ADCP commands by your model see [ADCP Supported commands list](#adcp-supported-commands-list).
 
