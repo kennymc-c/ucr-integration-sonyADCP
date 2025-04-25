@@ -165,8 +165,9 @@ async def on_subscribe_entities(entity_ids: list[str]) -> None:
 
 
 
-#BUG No event when removing an entity as configured entity. Could be a UC Python library bug.
-# Therefore poller tasks will also be running for entities that have been removed as configured entities.
+#BUG No event when removing an entity as configured entity. Could be a UC Python library or core/web configurator bug.
+# https://github.com/unfoldedcircle/integration-python-library/issues/25
+# Therefore poller tasks will also be running for entities that have been removed as configured entities
 @api.listens_to(ucapi.Events.UNSUBSCRIBE_ENTITIES)
 async def on_unsubscribe_entities(entity_ids: list[str]) -> None:
     """

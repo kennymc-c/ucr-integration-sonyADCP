@@ -1,7 +1,7 @@
 {
     "driver_id": "sonyadcp",
-    "version": "1.1.0",
-    "release_date": "2025-04-19",
+    "version": "1.1.1",
+    "release_date": "2025-04-25",
     "min_core_api": "0.25.0",
     "name": { 
         "en": "Sony Projector (ADCP)",

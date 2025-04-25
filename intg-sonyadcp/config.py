@@ -56,7 +56,7 @@ class SimpleCommands (str, Enum):
     MODE_HDR_AUTO =                                             "MODE_HDR_AUTO"
     MODE_HDR_DYN_TONE_MAPPING_1 =                               "MODE_HDR_TONEMAP_1"
     MODE_HDR_DYN_TONE_MAPPING_2 =                               "MODE_HDR_TONEMAP_2"
-    MODE_HDR_DYN_TONE_MAPPING_3 =                               "MODE_HDR_TONEMAP_2"
+    MODE_HDR_DYN_TONE_MAPPING_3 =                               "MODE_HDR_TONEMAP_3"
     MODE_HDR_DYN_TONE_MAPPING_OFF =                             "MODE_HDR_TONEMAP_OFF"
     MODE_2D_3D_SELECT_AUTO =                                    "MODE_2D/3D_SEL_AUTO"
     MODE_2D_3D_SELECT_3D =                                      "MODE_2D/3D_SEL_3D"

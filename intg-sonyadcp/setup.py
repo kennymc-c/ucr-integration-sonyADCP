@@ -191,8 +191,10 @@ async def show_setup_basic(device_id = None) -> ucapi.SetupAction:
 
         config.Setup.set("setup_step", "basic_reconfigure")
 
-    #TODO Find out why Masked: True gets ignored and doesn't mask passwords in ucapi debug log messages like in:
+    #BUG Masked: True works in FYTA integration but not documented in the asyncapi documentation:
     # https://github.com/FYTA-GmbH/uc-integration-fyta/blob/31e27e660d56243c4fe6158220f036a2cdb3f340/driver.py#L199
+    # https://studio.asyncapi.com/?url=https://raw.githubusercontent.com/unfoldedcircle/core-api/main/integration-api/UCR-integration-asyncapi.yaml#schema-SettingTypeText
+    # Missing masking also mentioned in https://github.com/unfoldedcircle/feature-and-bug-tracker/issues/455
     return ucapi.RequestUserInput(
             {
                 "en": "Basic Setup",
@@ -232,8 +234,7 @@ async def show_setup_basic(device_id = None) -> ucapi.SetupAction:
                             },
                     "field": {
                         "text": {
-                            "value": adcp_password,
-                            "masked": True
+                            "value": adcp_password
                         }
                     },
                 },
@@ -277,7 +278,8 @@ async def handle_response_basic(msg: ucapi.UserDataResponse) -> ucapi.SetupActio
     advanced_settings = msg.input_values["advanced_settings"]
 
     if ip != "":
-        #Check if input is a valid ipv4 or ipv6 address
+        #TODO Add regex check for ip address directly in json schema like described in the asyncapi documentation
+        # https://studio.asyncapi.com/?url=https://raw.githubusercontent.com/unfoldedcircle/core-api/main/integration-api/UCR-integration-asyncapi.yaml#schema-SettingTypeText
         _LOG.info("Entered ip address: " + ip)
         try:
             ip_address(ip)
