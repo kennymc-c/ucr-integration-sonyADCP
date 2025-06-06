@@ -45,6 +45,7 @@ class Commands (str, Enum):
     PICTURE_MODE = "picture_mode"
     PICTURE_POSITION_SELECT = "pic_pos_sel"
     PICTURE_POSITION_SAVE = "pic_pos_save"
+    PICTURE_POSITION_DELETE = "pic_pos_del"
     ASPECT = "aspect"
     MOTIONFLOW = "motionflow"
     HDR = "hdr"
@@ -112,7 +113,7 @@ class Values():
         GAME = "\"game\""
 
     class PicturePositions (str, Enum):
-        """This class is used to define the picture positions that can be used with the picture_position command"""
+        """This class is used to define the picture positions that can be used with the picture_position_select command"""
 
         PP_1_85 = "\"1.85_1\""
         PP_2_35 = "\"2.35_1\""
@@ -121,6 +122,17 @@ class Values():
         CUSTOM3 = "\"custom3\""
         CUSTOM4 = "\"custom4\""
         CUSTOM5 = "\"custom5\""
+
+    class PicturePositionsManage (str, Enum):
+        """This class is used to define the picture positions that can be used with the picture_position_save and delete command"""
+
+        PP_1_85 = "--1.85_1"
+        PP_2_35 = "--2.35_1"
+        CUSTOM1 = "--custom1"
+        CUSTOM2 = "--custom2"
+        CUSTOM3 = "--custom3"
+        CUSTOM4 = "--custom4"
+        CUSTOM5 = "--custom5"
 
     class Aspect (str, Enum):
         """This class is used to define the aspect ratios that can be used with the aspect command"""
@@ -400,27 +412,25 @@ class Projector:
 
                     if response:
                         if "err_cmd" in response:
-                            raise NameError(f"ADCP command \"{command}\" can not be recognized or is not supported on this model")
-                        elif "err_val" in response:
-                            raise ValueError(f"Value error in ADCP command \"{command}\". Value is out of range or invalid")
-                        elif "err_option" in response:
-                            raise AttributeError(f"Option in ADCP command \"{command}\" not supported, invalid or missing")
-                        elif "err_inactive" in response:
+                            raise NameError(f"Format error: ADCP command \"{command}\" can not be recognized or is not supported on this model")
+                        if "err_val" in response:
+                            raise ValueError(f"Value error: ADCP command \"{command}\". Value is out of range or invalid")
+                        if "err_option" in response:
+                            raise AttributeError(f"Option error: ADCP command \"{command}\" not supported, invalid or missing")
+                        if "err_inactive" in response:
                             raise Exception(f"ADCP command \"{command}\" temporarily unavailable")
-                        elif "err_internal1" in response or "err_internal2" in response:
+                        if "err_internal1" in response or "err_internal2" in response:
                             raise Exception(f"Internal ADCP communication error while sending command \"{command}\"")
-                        elif (response.startswith('"') or response.startswith("[")) and (response.endswith('"') or response.endswith("]")):
+                        if (response.startswith('"') or response.startswith("[")) and (response.endswith('"') or response.endswith("]")):
                             _LOG.debug(f"Received ADCP query value response: {response}")
                             return response
-                        elif command.endswith("?"):
+                        if command.endswith("?"):
                             _LOG.debug(f"Received ADCP query numeric value response: {response}")
                             return response
-                        elif response == "ok":
+                        if response == "ok":
                             return True
-                        else:
-                            raise Exception(f"Received an unknown ADCP response for command \"{command}\": {response}")
-                    else:
-                        raise Exception(f"Received no ADCP response for command \"{command}\"")
+                        raise Exception(f"Received an unknown ADCP response for command \"{command}\": {response}")
+                    raise Exception(f"Received no ADCP response for command \"{command}\"")
 
         except asyncio.TimeoutError as timeout:
             _LOG.error(f"ADCP timeout occurred after {self.adcp_timeout} seconds while sending command \"{command}\"")
