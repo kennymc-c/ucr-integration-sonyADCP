@@ -6,7 +6,7 @@ This software may contain bugs that could affect system stability. Please use it
 
 ## <!-- omit in toc -->
 
-Integration for Unfolded Circle Remote Devices running [Unfolded OS](https://www.unfoldedcircle.com/unfolded-os) (currently [Remote Two](https://www.unfoldedcircle.com/remote-two) and the upcoming [Remote 3](https://www.unfoldedcircle.com)) to control Sony projectors that support the ADCP protocol.
+Integration for Unfolded Circle Remote Devices running [Unfolded OS](https://www.unfoldedcircle.com/unfolded-os) (currently Remote Two and [Remote 3](https://www.unfoldedcircle.com)) to control Sony projectors that support the ADCP protocol.
 
 Using [uc-integration-api](https://github.com/aitatoi/integration-python-library).
 
@@ -32,9 +32,10 @@ Using [uc-integration-api](https://github.com/aitatoi/integration-python-library
   - [Run on the remote as a custom integration driver](#run-on-the-remote-as-a-custom-integration-driver)
     - [Limitations / Disclaimer](#limitations--disclaimer)
       - [Missing firmware features](#missing-firmware-features)
-    - [Download integration driver](#download-integration-driver)
-    - [Install the custom integration driver on the remote](#install-the-custom-integration-driver-on-the-remote)
-      - [Upload via Core API or 3rd party tools](#upload-via-core-api-or-3rd-party-tools)
+    - [1 - Download integration driver](#1---download-integration-driver)
+    - [2 - Upload \& installation](#2---upload--installation)
+      - [Upload in Web Configurator](#upload-in-web-configurator)
+      - [Alternative - Upload via Core API or 3rd party tools](#alternative---upload-via-core-api-or-3rd-party-tools)
   - [Run on a separate device as an external integration](#run-on-a-separate-device-as-an-external-integration)
     - [Remote requirements](#remote-requirements)
     - [Bare metal/VM](#bare-metalvm)
@@ -84,7 +85,7 @@ On most projectors ADCP and Advertisement via SDAP is turned on by default. Plea
 
 ### Advanced setup settings
 
-If you're using different ports for ADCP or SDAP advertisement than the default values, you need to activate the advanced settings option when configuring the integration. Here you can change the ADCP/SDAP ports & ADCP password and timeout as well as the interval of both poller intervals.
+If you're using different ports for ADCP or SDAP advertisement than the default values, you need to activate the advanced settings option when configuring the integration. Here you can change the ADCP/SDAP ports and timeout as well as the interval of both poller intervals.
 
 Please note that when running this integration on the remote the power/mute/input poller interval is always set to 0 to deactivate this poller in order to reduce battery consumption and save cpu/memory usage.
 
@@ -215,22 +216,24 @@ The sensor value will be updated every time the projector is powered on or off b
 
 #### Limitations / Disclaimer
 
-⚠️ This feature is currently only available in beta firmware releases and requires version 1.9.2 or newer. Please keep in mind that due to the beta status there are missing firmware features that require workarounds (see below) and that changes in future beta updates may temporarily or permanently break the functionality of this integration as a custom integration. Please wait until custom integrations are available in stable firmware releases if you don't want to take these risks.
+_⚠️ This feature is currently only available in beta firmware releases and requires version 1.9.2 or newer. Please keep in mind that due to the beta status there are missing firmware features that require workarounds (see below)._
 
 ##### Missing firmware features
 
 - The configuration file of custom integrations are not included in backups.
 - You currently can't update custom integrations. You need to delete the integration from the integrations menu first and then re-upload the new version. Do not edit any activity or macros that includes entities from this integration after you removed the integration and wait until the new version has been uploaded and installed. You also need to add re-add entities to the main pages after the update as they are automatically removed. An update function will probably be added once the custom integrations feature will be available in stable firmware releases.
 
-#### Download integration driver
+#### 1 - Download integration driver
 
-Download the uc-intg-sonyadcp-x.x.x-aarch64.tar.gz archive in the assets section from the [latest release](https://github.com/kennymc-c/ucr2-integration-sonyADCP/releases/latest)
+Download the uc-intg-sonyadcp-x.x.x-aarch64.tar.gz archive in the assets section from the [latest release](https://github.com/kennymc-c/ucr2-integration-sonyADCP/releases/latest).
 
-#### Install the custom integration driver on the remote
+#### 2 - Upload & installation
 
-Since firmware version 2.2.0 you can upload custom integrations in the web configurator. Go to integrations, click on install custom and choose the downloaded tar.gz file
+##### Upload in Web Configurator
 
-##### Upload via Core API or 3rd party tools
+Since firmware version 2.2.0 you can upload custom integrations in the web configurator. Go to _Integrations_ in the top menu, on the top right click on _Add new/Install custom_ and choose the downloaded tar.gz file.
+
+##### Alternative - Upload via Core API or 3rd party tools
 
 ```shell
 curl --location 'http://$IP/api/intg/install' \
