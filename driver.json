@@ -1,7 +1,7 @@
 {
     "driver_id": "sonyadcp",
-    "version": "1.1.2",
-    "release_date": "2025-06-06",
+    "version": "1.2.0",
+    "release_date": "2025-07-21",
     "min_core_api": "0.25.0",
     "name": { 
         "en": "Sony Projector (ADCP)",
@@ -9,8 +9,8 @@
       },
     "icon": "uc:projector",
     "description": {
-        "en": "Integration to control Sony projectors that support the ADCP protocol.",
-        "de": "Integration zum Steuern von Sony Projektoren, die das ADCP-Protokoll unterstützen."
+        "en": "Integration to control Sony projectors that support the ADCP protocol. Refresh icon by Icons8 (https://icons8.com/icon/59872/refresh)",
+        "de": "Integration zum Steuern von Sony Projektoren, die das ADCP-Protokoll unterstützen. Aktualisieren-Symbol von Icons8 (https://icons8.com/icon/59872/refresh)"
       },
     "port": 9081,
     "developer": {

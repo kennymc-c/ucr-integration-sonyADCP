@@ -101,6 +101,8 @@ class SimpleCommands (str, Enum):
     LAMP_CONTROL_HIGH =                                         "LAMP_CONTROL_HIGH"
     MENU_POSITION_BOTTOM_LEFT =                                 "MENU_POS_BOTTOM_LEFT"
     MENU_POSITION_CENTER =                                      "MENU_POS_CENTER"
+    UPDATE_VIDEO_INFO =                                         "UPDATE_VIDEO_INFO"
+    UPDATE_HEALTH_STATUS =                                      "UPDATE_HEALTH_STATUS"
 
 
 
@@ -133,7 +135,7 @@ class UC2ADCP:
         SimpleCommands.LENS_ZOOM_SMALL: ADCP.Commands.LENS_ZOOM_SMALL,
         SimpleCommands.LASER_DIM_UP: ADCP.Commands.LASER_DIM_UP,
         SimpleCommands.LASER_DIM_DOWN: ADCP.Commands.LASER_DIM_DOWN,
-        #Add .value for commands that require a value to use the string an not the enum in f string
+        #Add .value for commands that require a value to use the string and not the enum in f string
         ucapi.media_player.Commands.MUTE: f"{ADCP.Commands.MUTE.value} {ADCP.Values.States.ON.value}",
         ucapi.media_player.Commands.UNMUTE: f"{ADCP.Commands.MUTE.value} {ADCP.Values.States.OFF.value}",
         SimpleCommands.INPUT_HDMI1: f"{ADCP.Commands.INPUT.value} {ADCP.Values.Inputs.HDMI1.value}",
@@ -224,13 +226,20 @@ class MediaPlayer():
         ucapi.media_player.Features.MUTE_TOGGLE,
         ucapi.media_player.Features.DPAD,
         ucapi.media_player.Features.HOME,
-        ucapi.media_player.Features.SELECT_SOURCE
+        ucapi.media_player.Features.SELECT_SOURCE,
+        ucapi.media_player.Features.MEDIA_TITLE,
+        ucapi.media_player.Features.MEDIA_ARTIST,
+        ucapi.media_player.Features.PLAY_PAUSE,
+        ucapi.media_player.Features.MEDIA_IMAGE_URL
         ]
     _attributes = {
         ucapi.media_player.Attributes.STATE: ucapi.media_player.States.UNKNOWN,
         ucapi.media_player.Attributes.MUTED: False,
         ucapi.media_player.Attributes.SOURCE: "",
-        ucapi.media_player.Attributes.SOURCE_LIST: [cmd.value for cmd in Sources]
+        ucapi.media_player.Attributes.SOURCE_LIST: [cmd.value for cmd in Sources],
+        ucapi.media_player.Attributes.MEDIA_IMAGE_URL: "https://img.icons8.com/ios-glyphs/420/FFFFFF/refresh--v1.png"
+        #BUG Using a data url instead of a web url for media image url results in a ui error: https://github.com/unfoldedcircle/feature-and-bug-tracker/issues/529
+        #TODO #WAIT Replace media image web url with data url when bug is solved
         }
     _options = {
         ucapi.media_player.Options.SIMPLE_COMMANDS: [cmd.value for cmd in SimpleCommands]
@@ -311,6 +320,75 @@ class LSTSensor:
 
 
 
+class VISensor:
+    """Video info sensor entity definition class that includes the device class, attributes and options"""
+
+    _device_class = ucapi.sensor.DeviceClasses.CUSTOM
+    _attributes = {
+        ucapi.sensor.Attributes.STATE: ucapi.sensor.States.ON,
+        }
+
+    def get_def(self, ent_id: str, name: str):
+        """Returns the video info sensor entity definition for the api call"""
+
+        definition = ucapi.Sensor(
+            ent_id,
+            name,
+            features=None, #Mandatory although sensor entities have no features
+            attributes=self._attributes,
+            device_class=self._device_class,
+        )
+
+        return definition
+
+
+
+class TEMPSensor:
+    """Temperature sensor entity definition class that includes the device class, attributes and options"""
+
+    _device_class = ucapi.sensor.DeviceClasses.TEMPERATURE
+    _attributes = {
+        ucapi.sensor.Attributes.STATE: ucapi.sensor.States.ON,
+        }
+
+    def get_def(self, ent_id: str, name: str):
+        """Returns the temperature sensor entity definition for the api call"""
+
+        definition = ucapi.Sensor(
+            ent_id,
+            name,
+            features=None, #Mandatory although sensor entities have no features
+            attributes=self._attributes,
+            device_class=self._device_class,
+        )
+
+        return definition
+
+
+
+class SYSTEMSensor:
+    """System status sensor entity definition class that includes the device class, attributes and options"""
+
+    _device_class = ucapi.sensor.DeviceClasses.CUSTOM
+    _attributes = {
+        ucapi.sensor.Attributes.STATE: ucapi.sensor.States.ON,
+        }
+
+    def get_def(self, ent_id: str, name: str):
+        """Returns the temperature sensor entity definition for the api call"""
+
+        definition = ucapi.Sensor(
+            ent_id,
+            name,
+            features=None, #Mandatory although sensor entities have no features
+            attributes=self._attributes,
+            device_class=self._device_class,
+        )
+
+        return definition
+
+
+
 class PasswordManager:
     """Class to encrypt and decrypt the ADCP password."""
 
@@ -370,10 +448,10 @@ class Setup:
         "default_adcp_timeout": 5,
         "default_sdap_port": 53862,
         "default_mp_poller_interval": 20,  # Use 0 to deactivate; will be automatically set to 0 when running on the remote (bundle_mode: True)
-        "default_lt_poller_interval": 1800,  # Use 0 to deactivate
+        "default_health_poller_interval": 1800,  # Use 0 to deactivate
     }
     __setters = ["setup_complete", "setup_reconfigure", "setup_step", "setup_auto_discovery", "setup_reconfigure_device", \
-                 "standby", "bundle_mode", "cfg_path", "default_mp_poller_interval", "default_lt_poller_interval"]
+                 "standby", "bundle_mode", "cfg_path", "default_mp_poller_interval", "default_health_poller_interval"]
     __storers = ["setup_complete"]  # Skip runtime only related keys in config file
 
     @staticmethod
@@ -637,20 +715,44 @@ class Devices:
 
     @staticmethod
     def set_remote_and_sensor_data(device_id: str):
-        """Generate light source timer sensor entity id and name and store it"""
+        """Generate remote, light source timer and video info sensor entity id and name and store it"""
 
         _LOG.info("Generate remote id and light source timer sensor entity id and name")
 
         rt_id = "remote-" + device_id
         name = Devices.get(device_id=device_id, key="name")
 
-        lt_entity_id = "lighttimer-" + device_id
-        lt_entity_name = {
+        sensor_light_entity_id = "lighttimer-" + device_id #Use lighttimer prefix instead of sensor-light to remain compatible with older setups
+        sensor_light_entity_name = {
             "en": "Light source timer " + device_id,
             "de": "Lichtquellen-Timer " + name
         }
 
-        data = {"rt-id": rt_id, "lt-id": lt_entity_id, "lt-name": lt_entity_name}
+        sensor_video_entity_id = "sensor-video-" + device_id
+        sensor_video_entity_name = {
+            "en": "Video signal " + device_id,
+            "de": "Video-Signal " + name
+        }
+
+        sensor_temp_entity_id = "sensor-temp-" + device_id
+        sensor_temp_entity_name = {
+            "en": "Temperature " + device_id,
+            "de": "Temperatur " + name
+        }
+
+        sensor_system_entity_id = "sensor-system-" + device_id
+        sensor_system_entity_name = {
+            "en": "System status " + device_id,
+            "de": "System-Status " + name
+        }
+
+        data = {"rt-id": rt_id, \
+                #Use lt prefix instead of sensor-light to remain compatible with older configuration files
+                "lt-id": sensor_light_entity_id, "lt-name": sensor_light_entity_name, \
+                "sensor-video-id": sensor_video_entity_id, "sensor-video-name": sensor_video_entity_name, \
+                "sensor-temp-id": sensor_temp_entity_id, "sensor-temp-name": sensor_temp_entity_name, \
+                "sensor-system-id": sensor_system_entity_id, "sensor-system-name": sensor_system_entity_name \
+                }
         try:
             Devices.add(device_id, entity_data=data)
         except ValueError as v:

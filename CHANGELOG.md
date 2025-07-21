@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2025-07-21
+
+### Fixed
+
+- Fixed wrong mapping of dynamic light control limited command in remote entity
+
+### Added
+
+- Added a video signal sensor that shows the current resolution, framerate, dynamic range format, color space, color format and 2D/3D status
+  - Video signal data is automatically updated when the projector or video muting is turned on or off and when the input is changed
+- Added video signal infos (see above) as media playback attributes (artist and title) to show them in activities within the media widget as sensors can't be added to activities
+  - If you tap on the refresh icon in the media widget the data is updated
+- Added a projector temperature and a system status sensor to show error and warning messages
+  - The sensor will only be added as available entity if your model can provide temperature data
+  - All health sensors (light source timer, temperature and error/warning) will automatically be updated by the health status poller (see below) and when the projector is turned on or off
+- Added simple commands to manually update video signal infos and all health status sensors (light source timer, temperature and error/warning) in both sensors and media playback attributes
+  - This can be used in macros or command sequences together with commands of your media playback devices where the video signal may get changed or updated (e.g. play, pause, enter/select)
+
+### Changed
+
+- Renamed the light source timer poller task to health status poller task because it now also polls temperature, error and warning messages
+
 ## [1.1.2] - 2025-06-06
 
 ### Changed

@@ -4,12 +4,14 @@
 
 import logging
 import json
+import re
 
 import ucapi
 
 import config
 import driver
 import sensor
+import media_player
 import adcp as ADCP
 
 _LOG = logging.getLogger(__name__)
@@ -38,34 +40,6 @@ def projector_def(device_id:str = None):
     valid_attributes = {key: value for key, value in attr.items() if value is not None}
 
     return ADCP.Projector(**valid_attributes)
-
-
-
-async def get_light_source_hours(device_id: str = None):
-    """Get the light source hours from the projector"""
-
-    if device_id is None:
-        #If no device_id is provided a temp device will be used instead
-        device_id = config.Setup.get("setup_temp_device")
-
-    _LOG.debug(f"Get light source hours for {device_id}")
-
-    try:
-        response = await projector_def(device_id).command(ADCP.Get.TIMER)
-        if response:
-            try:
-                hours_data = json.loads(response)
-                for item in hours_data:
-                    if "light_src" in item:
-                        return item["light_src"]
-                _LOG.warning(f"No light_src data found in response: {response}")
-            except json.JSONDecodeError as e:
-                _LOG.error(f"Failed to parse timer response: {e}")
-                _LOG.debug(f"Raw response: {response}")
-        return None
-    except Exception as e:
-        _LOG.error(e)
-        raise type(e) from e
 
 
 
@@ -111,12 +85,209 @@ async def get_attr_source(device_id: str):
 
 
 
+async def get_light_source_hours(device_id: str = None):
+    """Get the light source hours from the projector"""
+
+    if device_id is None:
+        #If no device_id is provided a temp device will be used instead
+        device_id = config.Setup.get("setup_temp_device")
+
+    _LOG.debug(f"Get light source hours for {device_id}")
+
+    try:
+        response = await projector_def(device_id).command(ADCP.Get.TIMER)
+        if response:
+            try:
+                hours_data = json.loads(response)
+                for item in hours_data:
+                    if "light_src" in item:
+                        return item["light_src"]
+                _LOG.warning(f"No light_src data found in response: {response}")
+            except json.JSONDecodeError as e:
+                _LOG.error(f"Failed to parse timer response: {e}")
+                _LOG.debug(f"Raw response: {response}")
+        return None
+    except Exception as e:
+        _LOG.error(e)
+        raise type(e) from e
+
+
+
+async def get_temp(device_id: str = None):
+    """Get the temperature from the projector"""
+
+    _LOG.debug(f"Get temperature for {device_id}")
+
+    try:
+        response = await projector_def(device_id).command(ADCP.Get.TEMPERATURE)
+        if response:
+            try:
+                hours_data = json.loads(response)
+                for item in hours_data:
+                    if "intake_air" in item:
+                        return int(item["intake_air"])
+                _LOG.warning(f"No intake_air data found in response: {response}")
+            except json.JSONDecodeError as e:
+                _LOG.error(f"Failed to parse temperature response: {e}")
+                _LOG.debug(f"Raw response: {response}")
+    except OSError:
+        _LOG.warning("Temperature polling is temporally unavailable. The projector is probably turned off")
+    except NameError:
+        _LOG.info("Temperature polling is not supported on this projector model")
+    except Exception as e:
+        _LOG.error(e)
+        raise type(e) from e
+
+
+async def get_error(device_id: str = None):
+    """Get error messages from the projector"""
+
+    _LOG.debug(f"Get error messages for {device_id}")
+
+    try:
+        response = await projector_def(device_id).command(ADCP.Get.ERROR)
+        if response:
+            try:
+                error_msg_json = json.loads(response)
+                if isinstance(error_msg_json, list):
+                    error_msgs = [
+                        str(item).replace("err", "error").replace("_", " ").title()
+                        for item in error_msg_json if item
+                    ]
+                    if error_msgs:
+                        return ", ".join(error_msgs)
+                    _LOG.warning(f"No error message data found in response: {response}")
+                    return ""
+            except json.JSONDecodeError as e:
+                _LOG.error(f"Failed to parse error message response: {e}")
+                _LOG.debug(f"Raw response: {response}")
+    except Exception as e:
+        _LOG.error(e)
+        raise type(e) from e
+
+
+
+async def get_warning(device_id: str = None):
+    """Get warning messages from the projector"""
+
+    _LOG.debug(f"Get warning messages for {device_id}")
+
+    try:
+        response = await projector_def(device_id).command(ADCP.Get.WARNING)
+        if response:
+            try:
+                warning_msg_json = json.loads(response)
+                if isinstance(warning_msg_json, list):
+                    warning_msgs = [
+                        str(item).replace("warn", "warning").replace("_", " ").title()
+                        for item in warning_msg_json if item
+                    ]
+                    if warning_msgs:
+                        return ", ".join(warning_msgs)
+                    _LOG.warning(f"No warning message data found in response: {response}")
+            except json.JSONDecodeError as e:
+                _LOG.error(f"Failed to parse warning message response: {e}")
+                _LOG.debug(f"Raw response: {response}")
+    except Exception as e:
+        _LOG.error(e)
+        raise type(e) from e
+
+
+
+async def get_resolution(device_id: str):
+    """Get the current video input resolution from the projector and return it as a string"""
+
+    _LOG.debug(f"Get current video input resolution for {device_id}")
+    try:
+        signal = await projector_def(device_id).command(ADCP.Get.SIGNAL)
+        signal = signal.replace('"', "").replace("/", " / ")
+    except Exception as e:
+        raise type(e)(str(e)) from e
+    return signal
+
+
+
+async def get_dynamic_range(device_id: str):
+    """Get the current dynamic range (sdr, hdr10, hlg) from the projector and return it as a string"""
+
+    _LOG.debug(f"Get current dynamic range for {device_id}")
+    try:
+        dyn_range = await projector_def(device_id).command(ADCP.Get.HDR_FORMAT)
+        dyn_range = dyn_range.replace('"', "")
+        dyn_range = dyn_range.upper()
+    except OSError: #HDR Format command is temporally unavailable means range is SDR
+        dyn_range = "SDR"
+    except Exception as e:
+        raise type(e)(str(e)) from e
+    return dyn_range
+
+
+
+async def get_color_space(device_id: str):
+    """Get the current color space from the projector and return it as a string"""
+
+    _LOG.debug(f"Get current color space for {device_id}")
+    try:
+        color_space = await projector_def(device_id).command(ADCP.Get.COLOR_SPACE)
+        color_space = color_space.replace('"', "").upper().replace("BT", "BT.")
+    except Exception as e:
+        raise type(e)(str(e)) from e
+    return color_space
+
+
+
+async def get_color_format(device_id: str):
+    """Get the current color format from the projector and return it as a string"""
+
+    _LOG.debug(f"Get current color format for {device_id}")
+    try:
+        color_format = await projector_def(device_id).command(ADCP.Get.COLOR_FORMAT)
+        color_format = color_format.replace('"', "").upper().replace("YCBCR", "YCbCr")
+        # Convert YcbCr422 to YCbCr 4:2:2
+        color_format = re.sub(r"(\d)", r" \1:", color_format, count=1)
+        color_format = re.sub(r"(?<=\d)(\d)", r":\1", color_format)
+        color_format = color_format.rstrip(":")
+    except Exception as e:
+        raise type(e)(str(e)) from e
+    return color_format
+
+
+
+async def get_mode_2d_3d(device_id: str):
+    """Get the current 2d/3d mode from the projector and return it as a string"""
+
+    _LOG.debug(f"Get current 2d/3d mode for {device_id}")
+    try:
+        mode = await projector_def(device_id).command(ADCP.Get.MODE_2D_3D)
+        mode = mode.replace('"', "")
+        mode = mode.upper()
+    except Exception as e:
+        raise type(e)(str(e)) from e
+    return mode
+
+
+
 async def send_cmd(device_id: str, cmd_name:str, params = None):
     """Send a command to the projector and raise an exception if it fails"""
 
     projector_adcp = projector_def(device_id)
 
-    if cmd_name == ucapi.media_player.Commands.SELECT_SOURCE:
+    if cmd_name in (config.SimpleCommands.UPDATE_VIDEO_INFO, ucapi.media_player.Commands.PLAY_PAUSE):
+        try:
+            await sensor.update_video(device_id)
+            await media_player.update_video(device_id)
+        except Exception as e:
+            raise type(e)(str(e))
+
+    elif cmd_name == config.SimpleCommands.UPDATE_HEALTH_STATUS:
+        try:
+            await sensor.update_light(device_id)
+            await sensor.update_temp(device_id)
+            await sensor.update_system(device_id)
+        except Exception as e:
+            raise type(e)(str(e))
+
+    elif cmd_name == ucapi.media_player.Commands.SELECT_SOURCE:
         source = params["source"]
 
         try:
@@ -148,7 +319,7 @@ async def send_cmd(device_id: str, cmd_name:str, params = None):
             adcp_cmd = config.UC2ADCP.get(cmd_name)
         except KeyError as k:
             if not any(cmd_name == item.value for item in ucapi.media_player.Commands):
-                _LOG.info(f"Could't find a matching entity or simple command. \"{cmd_name}\" could to be a native ADCP command. Skipping conversion")
+                _LOG.info(f"Could't find a matching entity or simple command. \"{cmd_name}\" could be a native ADCP command. Skipping conversion")
                 try:
                     await projector_adcp.command(cmd_name)
                 except Exception as e:
@@ -174,7 +345,7 @@ async def send_cmd(device_id: str, cmd_name:str, params = None):
 
 
 async def update_attributes(device_id:str , cmd_name:str):
-    """Update certain entity attributes and sensor values if the command changes these attributes"""
+    """Update media player, remote and sensor entity attributes and values if the command changes or could potentially change these attributes or values"""
 
     mp_id = device_id
     rt_id = mp_id
@@ -185,7 +356,11 @@ async def update_attributes(device_id:str , cmd_name:str):
             try:
                 driver.api.configured_entities.update_attributes(mp_id, {ucapi.media_player.Attributes.STATE: ucapi.media_player.States.ON})
                 driver.api.configured_entities.update_attributes(rt_id, {ucapi.remote.Attributes.STATE: ucapi.remote.States.ON})
-                sensor.update_lt(device_id)
+                await sensor.update_light(device_id)
+                await sensor.update_temp(device_id)
+                await sensor.update_system(device_id)
+                await sensor.update_video(device_id)
+                await media_player.update_video(device_id)
             except Exception as e:
                 raise type(e)(str(e))
             _LOG.info("Media player power status attribute set to \"ON\"")
@@ -194,7 +369,11 @@ async def update_attributes(device_id:str , cmd_name:str):
             try:
                 driver.api.configured_entities.update_attributes(mp_id, {ucapi.media_player.Attributes.STATE: ucapi.media_player.States.OFF})
                 driver.api.configured_entities.update_attributes(rt_id, {ucapi.remote.Attributes.STATE: ucapi.remote.States.OFF})
-                sensor.update_lt(device_id)
+                await sensor.update_light(device_id)
+                await sensor.update_temp(device_id)
+                await sensor.update_system(device_id)
+                await sensor.update_video(device_id)
+                await media_player.update_video(device_id)
             except Exception as e:
                 raise type(e)(str(e))
             _LOG.info("Media player power status attribute set to \"OFF\"")
@@ -210,6 +389,11 @@ async def update_attributes(device_id:str , cmd_name:str):
 
             driver.api.configured_entities.update_attributes(mp_id, power_state)
             driver.api.configured_entities.update_attributes(rt_id, power_state)
+            await sensor.update_light(device_id)
+            await sensor.update_temp(device_id)
+            await sensor.update_system(device_id)
+            await sensor.update_video(device_id)
+            await media_player.update_video(device_id)
 
             _LOG.info(f"Media player and remote entity power status attribute set to \"{power_state}\"")
 
@@ -228,9 +412,13 @@ async def update_attributes(device_id:str , cmd_name:str):
                 if mute_state is False:
                     driver.api.configured_entities.update_attributes(mp_id, {ucapi.media_player.Attributes.MUTED: False})
                     _LOG.info("Media player mute status attribute set to \"False\"")
+                    await sensor.update_video(device_id)
+                    await media_player.update_video(device_id)
                 elif mute_state is True:
                     driver.api.configured_entities.update_attributes(mp_id, {ucapi.media_player.Attributes.MUTED: True})
                     _LOG.info("Media player mute status attribute set to \"True\"")
+                    await sensor.update_video(device_id)
+                    await media_player.update_video(device_id)
             except Exception as e:
                 raise type(e)(str(e))
 
@@ -248,9 +436,13 @@ async def update_attributes(device_id:str , cmd_name:str):
                 if source == config.Sources.HDMI_1:
                     driver.api.configured_entities.update_attributes(mp_id, {ucapi.media_player.Attributes.SOURCE: source})
                     _LOG.info(f"Media player source attribute update to \"{source}\"")
+                    await sensor.update_video(device_id)
+                    await media_player.update_video(device_id)
                 elif source == config.Sources.HDMI_2:
                     driver.api.configured_entities.update_attributes(mp_id, {ucapi.media_player.Attributes.SOURCE: source})
                     _LOG.info(f"Media player source attribute update to \"{source}\"")
+                    await sensor.update_video(device_id)
+                    await media_player.update_video(device_id)
                 else:
                     raise ValueError("Unknown source: " + source)
             except Exception as e:

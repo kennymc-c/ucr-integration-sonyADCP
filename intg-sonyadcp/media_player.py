@@ -216,3 +216,80 @@ async def update_mp(device_id: str):
 
     else:
         _LOG.debug(f"No projector attributes for {device_id} to update. Skipping update process")
+
+
+async def update_video(device_id: str):
+    """Update video info data in media playback attributes"""
+
+    mp_id = device_id
+    no_signal = False
+    muted = False
+
+    _LOG.info(f"Updating video signal infos for {device_id} in media player attributes")
+
+    if await projector.get_attr_muted(device_id):
+        muted = True
+
+    if muted:
+        _LOG.info(f"Video is muted for projector {device_id}")
+        attributes_to_send = {ucapi.media_player.Attributes.MEDIA_TITLE: "Video muted", \
+                                ucapi.media_player.Attributes.MEDIA_ARTIST: ""
+                                }
+    else:
+        try:
+            resolution = await projector.get_resolution(device_id)
+            if resolution == "Invalid":
+                resolution = "No signal"
+                no_signal = True
+        except Exception as e:
+            _LOG.warning(f"Failed to get video resolution from {device_id}")
+            resolution = "Error"
+            raise Exception(e) from e
+
+        if no_signal:
+            attributes_to_send = {ucapi.media_player.Attributes.MEDIA_TITLE: resolution, \
+                                ucapi.media_player.Attributes.MEDIA_ARTIST: ""
+                                }
+        else:
+            try:
+                dyn_range = await projector.get_dynamic_range(device_id)
+            except Exception as e:
+                _LOG.warning(f"Failed to get color space from {device_id}")
+                dyn_range = "Error"
+                raise Exception(e) from e
+
+            try:
+                color_space = await projector.get_color_space(device_id)
+            except Exception as e:
+                _LOG.warning(f"Failed to get color space from {device_id}")
+                color_space = "Error"
+                raise Exception(e) from e
+
+            try:
+                color_format = await projector.get_color_format(device_id)
+            except Exception as e:
+                _LOG.warning(f"Failed to get color format from {device_id}")
+                color_format = "Error"
+                raise Exception(e) from e
+
+            try:
+                mode_2d_3d = await projector.get_mode_2d_3d(device_id)
+            except Exception as e:
+                _LOG.warning(f"Failed to get 2d/3d mode from {device_id}")
+                mode_2d_3d = "Error"
+                raise Exception(e) from e
+
+            attributes_to_send = {ucapi.media_player.Attributes.MEDIA_TITLE: f"{resolution} / {dyn_range}", \
+                                ucapi.media_player.Attributes.MEDIA_ARTIST: f"{color_space} / {color_format} / {mode_2d_3d}"
+                                }
+
+    try:
+        api_update_attributes = driver.api.configured_entities.update_attributes(mp_id, attributes_to_send)
+    except Exception as e:
+        _LOG.error(e)
+        raise Exception("Error while updating media player playback attributes for entity id " + mp_id) from e
+
+    if not api_update_attributes:
+        raise Exception("Media player entity " + mp_id + " not found. Please make sure it's added as a configured entity on the remote")
+
+    _LOG.info(f"Updated video signal infos for {device_id} media player playback attributes to {str(attributes_to_send)}")

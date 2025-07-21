@@ -27,6 +27,8 @@ class Get (str, Enum):
     MODE_2D_3D = "3d_status ?"
     #Query value only commands:
     SIGNAL = "signal ?"
+    COLOR_FORMAT = "color_format_info ?" #Not officially documented. Found out by analyzing the adcp.cgi files from the web interface
+    HDR_FORMAT = "hdr_info ?"  #Not officially documented. Found out by analyzing the adcp.cgi files from the web interface
     TIMER = "timer ?"
     TEMPERATURE = "temperature ?"
     WARNING = "warning ?"
@@ -418,7 +420,7 @@ class Projector:
                         if "err_option" in response:
                             raise AttributeError(f"Option error: ADCP command \"{command}\" not supported, invalid or missing")
                         if "err_inactive" in response:
-                            raise Exception(f"ADCP command \"{command}\" temporarily unavailable")
+                            raise OSError(f"ADCP command \"{command}\" temporarily unavailable")
                         if "err_internal1" in response or "err_internal2" in response:
                             raise Exception(f"Internal ADCP communication error while sending command \"{command}\"")
                         if (response.startswith('"') or response.startswith("[")) and (response.endswith('"') or response.endswith("]")):
@@ -449,6 +451,12 @@ Please check if port {self.adcp_port} is the correct port and if the projector i
         except PermissionError as perm_error:
             _LOG.error(f"Authentication error while sending ADCP command \"{command}\": {perm_error}")
             raise PermissionError from perm_error
-        except (Exception, NameError, ValueError, AttributeError) as error:
+        except OSError as os_error:
+            _LOG.warning(os_error)
+            raise OSError from os_error
+        except NameError as name_error:
+            _LOG.error(name_error)
+            raise NameError from name_error
+        except (Exception, ValueError, AttributeError) as error:
             _LOG.error(f"Failed to send ADCP command: {error}")
             raise Exception from error

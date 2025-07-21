@@ -61,7 +61,7 @@ async def driver_setup_handler(msg: ucapi.SetupDriver) -> ucapi.SetupAction:
     if config.Setup.get("setup_temp_device") != "":
         _LOG.info("Removing the setup temp device from config and stopping poller tasks for this device")
         await media_player.MpPollerController.stop(config.Setup.get("setup_temp_device"))
-        await sensor.LtPollerController.stop(config.Setup.get("setup_temp_device"))
+        await sensor.HealthPollerController.stop(config.Setup.get("setup_temp_device"))
         try:
             config.Devices.remove(config.Setup.get("setup_temp_device"))
         except ValueError:
@@ -335,14 +335,14 @@ async def show_setup_advanced():
             adcp_timeout = config.Devices.get(device_id, "adcp_timeout")
             sdap_port = config.Devices.get(device_id, "sdap_port")
             mp_poller_interval = config.Devices.get(device_id, "mp_poller_interval")
-            lt_poller_interval = config.Devices.get(device_id, "lt_poller_interval")
+            health_poller_interval = config.Devices.get(device_id, "health_poller_interval")
             config.Setup.set("setup_step", "advanced_reconfigure")
         else:
             adcp_port = config.Setup.get("default_adcp_port")
             adcp_timeout = config.Setup.get("default_adcp_timeout")
             sdap_port = config.Setup.get("default_sdap_port")
             mp_poller_interval = config.Setup.get("default_mp_poller_interval")
-            lt_poller_interval = config.Setup.get("default_lt_poller_interval")
+            health_poller_interval = config.Setup.get("default_health_poller_interval")
             config.Setup.set("setup_step", "advanced")
     except ValueError as v:
         _LOG.error(v)
@@ -351,8 +351,9 @@ async def show_setup_advanced():
     adcp_timeout = adcp_timeout if adcp_timeout is not None else config.Setup.get("default_adcp_timeout")
     sdap_port = sdap_port if sdap_port is not None else config.Setup.get("default_sdap_port")
     mp_poller_interval = mp_poller_interval if mp_poller_interval is not None else config.Setup.get("default_mp_poller_interval")
-    lt_poller_interval = lt_poller_interval if lt_poller_interval is not None else config.Setup.get("default_lt_poller_interval")
+    health_poller_interval = health_poller_interval if health_poller_interval is not None else config.Setup.get("default_health_poller_interval")
 
+    #TODO Report bug to UC that \n\n in field text is causing an ui formatting error in the web configurator (wrong font and alignment offset too far to the right)
     return ucapi.RequestUserInput(
         {
             "en": "Advanced Settings",
@@ -402,19 +403,21 @@ async def show_setup_advanced():
                     "en":
                         "When running this integration as a custom integration on the remote itself it is best not to change these intervals or \
                         set them as high as possible to reduce battery consumption and save cpu/memory usage. \
-                        An interval set to high can lead to unstable system performance.",
+                        An interval set to high can lead to unstable system performance. \
+                        Values are in seconds. Use 0 to deactivate the task.",
                     "de":
                         "Wenn du diese Integration als Custom Integration auf der Remote selbst laufen lässt, ändere diese Intervalle am Besten nicht oder \
                         setze sie möglichst hoch, um den Batterieverbrauch zu reduzieren und die CPU-/Arbeitsspeichernutzung zu verringern. \
-                        Ein zu hoher Intervall kann zu einem instabilen System führen."
+                        Ein zu hoher Intervall kann zu einem instabilen System führen. \
+                        Die Werte werden in Sekunden angegeben. Verwende 0, um den Prozess zu deaktivieren."
                     } }
                 }
             },
             {
                 "id": "mp_poller_interval",
                 "label": {
-                        "en": "Projector power/mute/input poller interval (in seconds, 0 to deactivate):",
-                        "de": "Projektor Power/Mute/Eingang Poller-Interval (in Sekunden, 0 zum Deaktivieren):"
+                        "en": "Projector power/mute/input poller:",
+                        "de": "Projektor Power/Mute/Eingangs-Poller:"
                         },
                 "field": {"number": {
                                 "value": mp_poller_interval,
@@ -423,13 +426,13 @@ async def show_setup_advanced():
                         }
             },
             {
-                "id": "lt_poller_interval",
+                "id": "health_poller_interval",
                 "label": {
-                        "en": "Light source timer poller interval (in seconds, 0 to deactivate):",
-                        "de": "Lichtquellen-Poller-Interval (in Sekunden, 0 zum Deaktivieren):"
+                        "en": "Projector health status poller (light source timer, temperature, system status):",
+                        "de": "Projektor Gerätestatus-Poller (Lichtquellen-Timer, Temperatur, System-Status):"
                         },
                 "field": {"number": {
-                                "value": lt_poller_interval,
+                                "value": health_poller_interval,
                                 "decimals": 1
                                     }
                         }
@@ -452,7 +455,7 @@ async def handle_response_advanced(msg: ucapi.UserDataResponse) -> ucapi.SetupAc
     adcp_timeout = int(msg.input_values["adcp_timeout"])
     sdap_port = int(msg.input_values["sdap_port"])
     mp_poller_interval = int(msg.input_values["mp_poller_interval"])
-    lt_poller_interval = int(msg.input_values["lt_poller_interval"])
+    health_poller_interval = int(msg.input_values["health_poller_interval"])
 
     skip_entities = False
 
@@ -497,12 +500,12 @@ async def handle_response_advanced(msg: ucapi.UserDataResponse) -> ucapi.SetupAc
                 _LOG.debug("Mp poller interval has been changed back to default value. Removing from config")
                 config.Devices.remove(device_id=device_id, key="mp_poller_interval")
 
-        if lt_poller_interval != config.Setup.get("default_lt_poller_interval"):
-            config.Devices.add(device_id=device_id, entity_data={"lt_poller_interval": lt_poller_interval})
+        if health_poller_interval != config.Setup.get("default_health_poller_interval"):
+            config.Devices.add(device_id=device_id, entity_data={"health_poller_interval": health_poller_interval})
         else:
-            if config.Devices.get(device_id=device_id, key="lt_poller_interval") is not None:
+            if config.Devices.get(device_id=device_id, key="health_poller_interval") is not None:
                 _LOG.debug("Lt poller interval has been changed back to default value. Removing from config")
-                config.Devices.remove(device_id=device_id, key="lt_poller_interval")
+                config.Devices.remove(device_id=device_id, key="health_poller_interval")
 
     except ValueError as v:
         _LOG.error(v)
@@ -725,12 +728,21 @@ async def complete_setup(device_id:str = None, skip_entities:bool = False) -> uc
 
         await media_player.add_mp(device_id)
         await remote.add_remote(device_id)
-        await sensor.add_lt_sensor(device_id)
+        await sensor.add_light_sensor(device_id)
+        await sensor.add_video_sensor(device_id)
+        await sensor.add_system_sensor(device_id)
+
+        try:
+            await projector.get_temp(device_id)
+        except NameError:
+            _LOG.info("Temperature sensor will not be added as available entity")
+        else:
+            await sensor.add_temp_sensor(device_id)
 
     if config.Setup.get("setup_reconfigure") is True:
-        #During the initial setup all needed pollers tasks will be started with the subscribe entities event
+        #During the initial setup all needed pollers tasks will be started with the subscribe entities event when they get added as configured entities on the remote
         await media_player.MpPollerController.start(device_id)
-        await sensor.LtPollerController.start(device_id)
+        await sensor.HealthPollerController.start(device_id)
 
     config.Setup.set("setup_complete", True)
     _LOG.info("Setup complete")

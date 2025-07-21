@@ -27,7 +27,7 @@ Using [uc-integration-api](https://github.com/aitatoi/integration-python-library
   - [Default remote entity button mappings](#default-remote-entity-button-mappings)
   - [Attributes poller](#attributes-poller)
     - [Media player](#media-player)
-    - [Light source timer sensor](#light-source-timer-sensor)
+    - [Health status poller](#health-status-poller)
 - [Installation](#installation)
   - [Run on the remote as a custom integration driver](#run-on-the-remote-as-a-custom-integration-driver)
     - [Limitations / Disclaimer](#limitations--disclaimer)
@@ -93,15 +93,23 @@ Please note that when running this integration on the remote the power/mute/inpu
 
 - Media player
   - Source select feature to choose the input from a list
+  - Shows video signal infos in the media widget. Tap the refresh symbol to update the widget or use the UPDATE_VIDEO_INFO command
 - Remote
   - Pre-defined buttons mappings and ui pages with all available commands that can be customized in the web configurator
   - Send native ADCP commands via the send command and send command sequence command (useful for commands thats are not available as simple commands)
   - Use command sequences in the activity editor instead of creating a macro for each sequence. All command names have to be in upper case and separated by a comma
   - Support for repeat, delay and hold
     - Hold just repeats the command continuously for the given hold time. There is no native hold function for the ADCP protocol as with some ir devices to activate additional functions
-- Sensor
-  - Light source timer
-    - Light source hours will be updated every time the projector is powered on or off by the remote and automatically every 30 minutes (can be changed in the advanced setup) while the projector is powered on and the remote is not in sleep/standby mode or the integration is disconnected
+- Sensors
+  - Health sensors
+    - Light source timer
+    - Temperature
+      - The sensor will only be added as available entity if your model can provide temperature data
+    - System status (error and warning messages from the projector)
+    - All health sensors will be updated every time the projector is powered on or off by the remote and automatically every 30 minutes (can be changed in the advanced setup) while the projector is powered on and the remote is not in sleep/standby mode or the integration is disconnected
+  - Video signal
+    - Shows the current resolution, framerate, dynamic range format, color space, color format and 2D/3D status
+    - Video signal data is automatically updated when the projector or video muting is turned on or off and when the input is changed
 
 ## Commands & attributes
 
@@ -160,6 +168,8 @@ Please note that when running this integration on the remote the power/mute/inpu
   - Lens Shift Up/Down/Left/Right
   - Lens Focus Far/Near
   - Lens Zoom Large/Small
+- Update Health & Video signal info
+  - This can be used in macros or command sequences together with commands of your media playback devices where the video signal may get changed or updated (e.g. play, pause, enter/select)
 
 \* _Only works if a video signal is present at the input_ \
 \** _May not work work with all video signals. Please refer to Sony's user manual_ \
@@ -206,9 +216,9 @@ _The default button mappings and ui pages can be customized in the web configura
 
 By default the integration checks the status of all media player entity attributes **every 20 seconds** while the remote is not in standby/sleep mode or disconnected from the integration. The interval can be changed in the advanced settings. Set it to 0 to deactivate this function. **When running on the remote as a custom integration the interval will be automatically set to 0 to reduce battery consumption and save cpu/memory usage.**
 
-#### Light source timer sensor
+#### Health status poller
 
-The sensor value will be updated every time the projector is powered on or off by the remote and automatically **every 30 minutes by default while the projector is powered on** and the remote is not in sleep/standby mode or the integration is disconnected. The interval can be changed in the advanced settings.
+All health sensor data (light source timer, temperature and error/warning) will be updated every time the projector is powered on or off by the remote and automatically **every 30 minutes by default while the projector is powered on** and the remote is not in sleep/standby mode or the integration is disconnected. The interval can be changed in the advanced settings.
 
 ## Installation
 
@@ -374,9 +384,7 @@ If your projector is not listed in the supported commands list please contact yo
 
 ## Planned improvements
 
-- Add a sensor and use media player title, artist and album from the media player to show signal infos (resolution, framerate, color space, 2D/3D status, light source output setting/value, picture position)
-- Replace the light source timer sensor with a projector status sensor that also includes temperature, warning & error status
-- Add a simple command to trigger the update of sensor values and media player playback attributes as the integration itself and not the remote core are responsible for updating these data and frequent poller tasks are a battery killer. This command can e.g. be combined in a macro with the enter and return command of the media playback device.
+- Use multicast SDDP (Simple Device Discovery Protocol) for advertisement instead of SDAP which has limitations
 
 ## Credits
 

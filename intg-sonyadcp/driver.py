@@ -14,6 +14,7 @@ import setup
 import media_player
 import sensor
 import remote
+import projector
 
 _LOG = logging.getLogger("driver")  # avoid having __main__ in log messages
 
@@ -38,8 +39,11 @@ async def startcheck():
         for device_id in config.Devices.list():
             try:
                 mp_entity_id = device_id
-                rt_entity_id = mp_entity_id
-                lt_entity_id = config.Devices.get(device_id=device_id, key="lt-id")
+                rt_entity_id = config.Devices.get(device_id=device_id, key="rt-id")
+                sensor_light_entity_id = config.Devices.get(device_id=device_id, key="lt-id")
+                sensor_video_entity_id = config.Devices.get(device_id=device_id, key="sensor-video-id")
+                sensor_temp_entity_id = config.Devices.get(device_id=device_id, key="sensor-temp-id")
+                sensor_system_entity_id = config.Devices.get(device_id=device_id, key="sensor-system-id")
             except ValueError as v:
                 _LOG.error(v)
 
@@ -54,15 +58,35 @@ async def startcheck():
             else:
                 await remote.add_remote(device_id)
 
-            if api.available_entities.contains(lt_entity_id):
-                _LOG.debug("Projector light source timer sensor entity with id " + lt_entity_id + " is already in storage as available entity")
+            if api.available_entities.contains(sensor_light_entity_id):
+                _LOG.debug("Projector light source timer sensor entity with id " + sensor_light_entity_id + " is already in storage as available entity")
             else:
-                await sensor.add_lt_sensor(device_id)
+                await sensor.add_light_sensor(device_id)
+
+            if api.available_entities.contains(sensor_video_entity_id):
+                _LOG.debug("Projector video info sensor entity with id " + sensor_video_entity_id + " is already in storage as available entity")
+            else:
+                await sensor.add_video_sensor(device_id)
+
+            if api.available_entities.contains(sensor_temp_entity_id):
+                _LOG.debug("Projector temperature sensor entity with id " + sensor_temp_entity_id + " is already in storage as available entity")
+            else:
+                try:
+                    await projector.get_temp(device_id)
+                except NameError:
+                    _LOG.info("Temperature sensor will not be added as available entity")
+                else:
+                    await sensor.add_temp_sensor(device_id)
+
+            if api.available_entities.contains(sensor_system_entity_id):
+                _LOG.debug("Projector system status sensor entity with id " + sensor_system_entity_id + " is already in storage as available entity")
+            else:
+                await sensor.add_system_sensor(device_id)
     else:
         if len(config.Devices.list()) < 1:
-            _LOG.info("First time setup was not completed. Please restart the setup process")
-        else:
             _LOG.info("Please start the driver setup process")
+        else:
+            _LOG.info("First time setup was not completed. Please restart the setup process")
 
 
 
@@ -132,36 +156,73 @@ async def on_subscribe_entities(entity_ids: list[str]) -> None:
     config.Setup.set("standby", False)
 
     if config.Setup.get("setup_complete"):
+        #Only works if the media player entity of a device has been added as a configured entity as this entity is using the device id as it's id
+        device_ids = []
+
         for entity_id in entity_ids:
-            device_id = None
-            mp_entity_id = None
-            rt_entity_id = None
-            lt_entity_id = None
-
             if entity_id in config.Devices.list():
-                device_id = config.Devices.get(device_id=entity_id, key="device_id")
-                mp_entity_id = device_id
-                rt_entity_id = config.Devices.get(device_id=entity_id, key="rt-id")
-                lt_entity_id = config.Devices.get(device_id=device_id, key="lt-id")
+                device_ids.append(entity_id)
 
-            try:
-                if mp_entity_id and entity_id == mp_entity_id:
-                    await media_player.update_mp(device_id)
-                    await media_player.MpPollerController.start(device_id)
-                if lt_entity_id and entity_id == lt_entity_id:
-                    await sensor.update_lt(device_id)
-                    await sensor.LtPollerController.start(device_id)
-                if rt_entity_id and entity_id == rt_entity_id:
-                    await remote.update_rt(device_id)
-            except OSError as o:
-                _LOG.critical(o)
-            except Exception as e:
-                error_msg = str(e)
-                if error_msg:
-                    _LOG.warning(f"Failed to update attributes for entity {entity_id}")
-                    _LOG.warning(error_msg)
+        if not device_ids:
+            _LOG.error("No valid device ids found in entity ids list from entity subscribe message")
+            _LOG.warning("Please add at least the media player entity of a device as a configured entity")
+            _LOG.info("Skip starting poller tasks and update of attributes and poller")
+        else:
+            for device_id in device_ids:
+                sensor_light = False
+                sensor_temp = False
+                sensor_system = False
+
+                await media_player.update_mp(device_id)
+                await media_player.MpPollerController.start(device_id)
+
+                rt_id = config.Devices.get(device_id=device_id, key="rt-id")
+                sensor_video_id = config.Devices.get(device_id=device_id, key="sensor-video-id")
+
+                if rt_id in entity_ids:
+                    try:
+                        await remote.update_rt(device_id)
+                    except OSError as o:
+                        _LOG.critical(o)
+                    except Exception as e:
+                        error_msg = str(e)
+                        if error_msg:
+                            _LOG.warning(f"Failed to update attributes for entity {rt_id}")
+                            _LOG.warning(error_msg)
+                        else:
+                            _LOG.warning(f"Failed to update attributes for entity {rt_id}")
                 else:
-                    _LOG.warning(f"Failed to update attributes for entity {entity_id}")
+                    _LOG.debug(f"Remote entity for device {device_id} is not in the configured entities. Skip updating attributes")
+
+                if sensor_video_id in entity_ids:
+                    try:
+                        await sensor.update_video(device_id)
+                    except OSError as o:
+                        _LOG.critical(o)
+                    except Exception as e:
+                        error_msg = str(e)
+                        if error_msg:
+                            _LOG.warning(f"Failed to update attributes for entity {sensor_video_id}")
+                            _LOG.warning(error_msg)
+                        else:
+                            _LOG.warning(f"Failed to update attributes for entity {sensor_video_id}")
+                else:
+                    _LOG.debug(f"Video sensor entity for device {device_id} is not in the configured entities. Skip updating attributes")
+
+                if config.Devices.get(device_id=device_id, key="lt-id") in entity_ids:
+                    await sensor.update_light(device_id)
+                    sensor_light = True
+                if config.Devices.get(device_id=device_id, key="sensor-temp-id") in entity_ids:
+                    await sensor.update_temp(device_id)
+                    sensor_temp = True
+                if config.Devices.get(device_id=device_id, key="sensor-system-id") in entity_ids:
+                    await sensor.update_system(device_id)
+                    sensor_system = True
+
+                if sensor_light or sensor_temp or sensor_system:
+                    await sensor.HealthPollerController.start(device_id)
+                else:
+                    _LOG.debug(f"No health sensors for device {device_id} are in the configured entities. Skip starting health poller task")
 
 
 
@@ -181,13 +242,33 @@ async def on_unsubscribe_entities(entity_ids: list[str]) -> None:
 
     for entity_id in entity_ids:
         mp_entity_id= config.Devices.get(device_id=entity_id, key="id")
-        lt_entity_id = config.Devices.get(device_id=entity_id, key="lt-id")
+        rt_entity_id = config.Devices.get(device_id=entity_id, key="rt-id")
+        sensor_light_entity_id = config.Devices.get(device_id=entity_id, key="lt-id")
+        sensor_video_entity_id = config.Devices.get(device_id=entity_id, key="sensor-video-id")
+        sensor_temp_entity_id = config.Devices.get(device_id=entity_id, key="sensor-temp-id")
+        sensor_system_entity_id = config.Devices.get(device_id=entity_id, key="sensor-system-id")
 
         if mp_entity_id in entity_ids:
             await media_player.MpPollerController.stop(device_id=entity_id)
+            await media_player.remove_mp(device_id=entity_id)
 
-        if lt_entity_id in entity_ids:
-            await sensor.LtPollerController.stop(device_id=entity_id)
+        if rt_entity_id in entity_ids:
+            await remote.remove_remote(device_id=entity_id)
+
+        if sensor_light_entity_id in entity_ids:
+            await sensor.remove_light_sensor(device_id=entity_id)
+
+        if sensor_video_entity_id in entity_ids:
+            await sensor.remove_video_sensor(device_id=entity_id)
+
+        if sensor_temp_entity_id in entity_ids:
+            await sensor.remove_temp_sensor(device_id=entity_id)
+
+        if sensor_system_entity_id in entity_ids:
+            await sensor.remove_system_sensor(device_id=entity_id)
+
+        if sensor_light_entity_id and sensor_video_entity_id and sensor_temp_entity_id and sensor_system_entity_id in entity_ids:
+            await sensor.HealthPollerController.stop(device_id=entity_id)
 
 
 

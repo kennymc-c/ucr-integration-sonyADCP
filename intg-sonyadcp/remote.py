@@ -361,7 +361,7 @@ def create_ui_pages() -> list[ucapi.ui.UiPage | dict[str, Any]]:
     ui_page9.add(ucapi.ui.create_ui_text("Limited", 0, 6, size=ucapi.ui.Size(3, 1), cmd=ucapi.remote.create_send_cmd(config.SimpleCommands.MODE_DYN_IRIS_CONTROL_LIMITED)))
     ui_page9.add(ucapi.ui.create_ui_text("Off", 3, 4, size=ucapi.ui.Size(3, 1), cmd=ucapi.remote.create_send_cmd(config.SimpleCommands.MODE_DYN_LIGHT_CONTROL_OFF)))
     ui_page9.add(ucapi.ui.create_ui_text("Full", 3, 5, size=ucapi.ui.Size(3, 1), cmd=ucapi.remote.create_send_cmd(config.SimpleCommands.MODE_DYN_LIGHT_CONTROL_FULL)))
-    ui_page9.add(ucapi.ui.create_ui_text("Limited", 3, 6, size=ucapi.ui.Size(3, 1), cmd=ucapi.remote.create_send_cmd(config.SimpleCommands.MODE_DYN_IRIS_CONTROL_LIMITED)))
+    ui_page9.add(ucapi.ui.create_ui_text("Limited", 3, 6, size=ucapi.ui.Size(3, 1), cmd=ucapi.remote.create_send_cmd(config.SimpleCommands.MODE_DYN_LIGHT_CONTROL_LIMITED)))
 
     ui_page10 = ucapi.ui.UiPage("page10", "Miscellaneous")
     ui_page10.add(ucapi.ui.create_ui_text("-- Input Lag Reduction --", 0, 0, size=ucapi.ui.Size(4, 1)))
