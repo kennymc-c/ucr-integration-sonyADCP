@@ -160,6 +160,10 @@ async def mp_poller(device_id: str, interval: int) -> None:
 async def update_mp(device_id: str):
     """Retrieve input source, power status and muted status from the projector, compare them with the known status on the remote and update them if necessary"""
 
+    if driver.api.configured_entities.get(device_id) is None:
+        _LOG.info(f"Entity {device_id} not found in configured entities. Skip updating attributes")
+        return True
+
     try:
         _LOG.debug(f"Checking power/mute/input status for media player attributes poller task for {device_id}")
         power = await projector.get_attr_power(device_id)
@@ -175,9 +179,9 @@ async def update_mp(device_id: str):
         raise Exception(e) from e
 
     if stored_states != []:
-        attributes_stored = stored_states[0]["attributes"] # [0] = 1st entity that has been added
+        attributes_stored = next((state["attributes"] for state in stored_states if state["entity_id"] == device_id),None)
     else:
-        raise Exception("Got empty states from remote. Please make sure to add configured entities")
+        raise Exception(f"Got empty states for {device_id} from remote")
 
     stored_attributes = {"state": attributes_stored["state"], "muted": attributes_stored["muted"], "source": attributes_stored["source"]}
     current_attributes = {"state": power, "muted": muted, "source": source}
@@ -205,17 +209,15 @@ async def update_mp(device_id: str):
             attributes_to_send.update({ucapi.media_player.Attributes.SOURCE: source})
 
         try:
-            api_update_attributes = driver.api.configured_entities.update_attributes(device_id, attributes_to_send)
+            driver.api.configured_entities.update_attributes(device_id, attributes_to_send)
         except Exception as e:
             raise Exception("Error while updating attributes for entity id " + device_id) from e
 
-        if not api_update_attributes:
-            raise Exception("Entity " + device_id + " not found. Please make sure it's added as a configured entity on the remote")
-        else:
-            _LOG.info(f"Updated entity attribute(s) {str(attributes_to_update)} for {device_id}")
+        _LOG.info(f"Updated entity attribute(s) {str(attributes_to_update)} for {device_id}")
 
     else:
         _LOG.debug(f"No projector attributes for {device_id} to update. Skipping update process")
+
 
 
 async def update_video(device_id: str):
@@ -254,7 +256,7 @@ async def update_video(device_id: str):
             try:
                 dyn_range = await projector.get_dynamic_range(device_id)
             except Exception as e:
-                _LOG.warning(f"Failed to get color space from {device_id}")
+                _LOG.warning(f"Failed to get dynamic range from {device_id}")
                 dyn_range = "Error"
                 raise Exception(e) from e
 
@@ -290,6 +292,6 @@ async def update_video(device_id: str):
         raise Exception("Error while updating media player playback attributes for entity id " + mp_id) from e
 
     if not api_update_attributes:
-        raise Exception("Media player entity " + mp_id + " not found. Please make sure it's added as a configured entity on the remote")
+        driver.api.available_entities.update_attributes(mp_id, attributes_to_send)
 
     _LOG.info(f"Updated video signal infos for {device_id} media player playback attributes to {str(attributes_to_send)}")

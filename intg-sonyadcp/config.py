@@ -717,38 +717,42 @@ class Devices:
     def set_remote_and_sensor_data(device_id: str):
         """Generate remote, light source timer and video info sensor entity id and name and store it"""
 
-        _LOG.info("Generate remote id and light source timer sensor entity id and name")
+        _LOG.info("Generate remote id and sensor entity ids and names")
 
-        rt_id = "remote-" + device_id
         name = Devices.get(device_id=device_id, key="name")
 
-        sensor_light_entity_id = "lighttimer-" + device_id #Use lighttimer prefix instead of sensor-light to remain compatible with older setups
+        remote_entity_id = "remote-" + device_id
+        remote_entity_name = {
+            "en": name + " Remote",
+            "de": name + " Remote",
+        }
+
+        sensor_light_entity_id = "sensor-light-" + device_id
         sensor_light_entity_name = {
-            "en": "Light source timer " + device_id,
+            "en": "Light source timer " + name,
             "de": "Lichtquellen-Timer " + name
         }
 
         sensor_video_entity_id = "sensor-video-" + device_id
         sensor_video_entity_name = {
-            "en": "Video signal " + device_id,
+            "en": "Video signal " + name,
             "de": "Video-Signal " + name
         }
 
         sensor_temp_entity_id = "sensor-temp-" + device_id
         sensor_temp_entity_name = {
-            "en": "Temperature " + device_id,
+            "en": "Temperature " + name,
             "de": "Temperatur " + name
         }
 
         sensor_system_entity_id = "sensor-system-" + device_id
         sensor_system_entity_name = {
-            "en": "System status " + device_id,
+            "en": "System status " + name,
             "de": "System-Status " + name
         }
 
-        data = {"rt-id": rt_id, \
-                #Use lt prefix instead of sensor-light to remain compatible with older configuration files
-                "lt-id": sensor_light_entity_id, "lt-name": sensor_light_entity_name, \
+        data = {"remote-id": remote_entity_id, "remote-name": remote_entity_name, \
+                "sensor-light-id": sensor_light_entity_id, "sensor-light-name": sensor_light_entity_name, \
                 "sensor-video-id": sensor_video_entity_id, "sensor-video-name": sensor_video_entity_name, \
                 "sensor-temp-id": sensor_temp_entity_id, "sensor-temp-name": sensor_temp_entity_name, \
                 "sensor-system-id": sensor_system_entity_id, "sensor-system-name": sensor_system_entity_name \

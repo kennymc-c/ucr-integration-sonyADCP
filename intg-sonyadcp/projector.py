@@ -131,9 +131,13 @@ async def get_temp(device_id: str = None):
                 _LOG.error(f"Failed to parse temperature response: {e}")
                 _LOG.debug(f"Raw response: {response}")
     except OSError:
-        _LOG.warning("Temperature polling is temporally unavailable. The projector is probably turned off")
+        _LOG.info("Temperature polling is temporally unavailable. The projector is probably turned off")
+        _LOG.debug("Returning an empty string as value")
+        return ""
     except NameError:
         _LOG.info("Temperature polling is not supported on this projector model")
+        _LOG.debug("Retuning N/A as value")
+        return "N/A"
     except Exception as e:
         _LOG.error(e)
         raise type(e) from e
@@ -215,7 +219,7 @@ async def get_dynamic_range(device_id: str):
         dyn_range = await projector_def(device_id).command(ADCP.Get.HDR_FORMAT)
         dyn_range = dyn_range.replace('"', "")
         dyn_range = dyn_range.upper()
-    except OSError: #HDR Format command is temporally unavailable means range is SDR
+    except (OSError, NameError): #HDR Format command is temporally unavailable or not supported means range is SDR
         dyn_range = "SDR"
     except Exception as e:
         raise type(e)(str(e)) from e
@@ -261,6 +265,8 @@ async def get_mode_2d_3d(device_id: str):
         mode = await projector_def(device_id).command(ADCP.Get.MODE_2D_3D)
         mode = mode.replace('"', "")
         mode = mode.upper()
+    except (OSError, NameError): #3D status command is temporally unavailable or not supported means mode is 2D
+        mode = "2D"
     except Exception as e:
         raise type(e)(str(e)) from e
     return mode
@@ -340,7 +346,8 @@ async def send_cmd(device_id: str, cmd_name:str, params = None):
     try:
         await update_attributes(device_id, cmd_name)
     except Exception as e:
-        raise type(e)(str(e))
+        #No exception as this is not a critical error. The command itself was sent successfully. Not all query commands are supported by all projector models
+        _LOG.error(f"Failed to update attributes for device {device_id} after command {cmd_name}: {e}")
 
 
 
@@ -354,8 +361,10 @@ async def update_attributes(device_id:str , cmd_name:str):
 
         case ucapi.media_player.Commands.ON:
             try:
-                driver.api.configured_entities.update_attributes(mp_id, {ucapi.media_player.Attributes.STATE: ucapi.media_player.States.ON})
-                driver.api.configured_entities.update_attributes(rt_id, {ucapi.remote.Attributes.STATE: ucapi.remote.States.ON})
+                if driver.api.configured_entities.get(mp_id) is not None:
+                    driver.api.configured_entities.update_attributes(mp_id, {ucapi.media_player.Attributes.STATE: ucapi.media_player.States.ON})
+                if driver.api.configured_entities.get(rt_id) is not None:
+                    driver.api.configured_entities.update_attributes(rt_id, {ucapi.remote.Attributes.STATE: ucapi.remote.States.ON})
                 await sensor.update_light(device_id)
                 await sensor.update_temp(device_id)
                 await sensor.update_system(device_id)
@@ -367,8 +376,10 @@ async def update_attributes(device_id:str , cmd_name:str):
 
         case ucapi.media_player.Commands.OFF:
             try:
-                driver.api.configured_entities.update_attributes(mp_id, {ucapi.media_player.Attributes.STATE: ucapi.media_player.States.OFF})
-                driver.api.configured_entities.update_attributes(rt_id, {ucapi.remote.Attributes.STATE: ucapi.remote.States.OFF})
+                if driver.api.configured_entities.get(mp_id) is not None:
+                    driver.api.configured_entities.update_attributes(mp_id, {ucapi.media_player.Attributes.STATE: ucapi.media_player.States.OFF})
+                if driver.api.configured_entities.get(rt_id) is not None:
+                    driver.api.configured_entities.update_attributes(rt_id, {ucapi.remote.Attributes.STATE: ucapi.remote.States.OFF})
                 await sensor.update_light(device_id)
                 await sensor.update_temp(device_id)
                 await sensor.update_system(device_id)
@@ -384,11 +395,15 @@ async def update_attributes(device_id:str , cmd_name:str):
             except Exception as e:
                 _LOG.error(e)
                 _LOG.warning("Couldn't get power state. Set to unknown")
-                driver.api.configured_entities.update_attributes(mp_id, {ucapi.media_player.Attributes.STATE: ucapi.media_player.States.UNKNOWN})
-                driver.api.configured_entities.update_attributes(rt_id, {ucapi.remote.Attributes.STATE: ucapi.remote.States.UNKNOWN})
+                if driver.api.configured_entities.get(mp_id) is not None:
+                    driver.api.configured_entities.update_attributes(mp_id, {ucapi.media_player.Attributes.STATE: ucapi.media_player.States.UNKNOWN})
+                if driver.api.configured_entities.get(rt_id) is not None:
+                    driver.api.configured_entities.update_attributes(rt_id, {ucapi.remote.Attributes.STATE: ucapi.remote.States.UNKNOWN})
 
-            driver.api.configured_entities.update_attributes(mp_id, power_state)
-            driver.api.configured_entities.update_attributes(rt_id, power_state)
+            if driver.api.configured_entities.get(mp_id) is not None:
+                driver.api.configured_entities.update_attributes(mp_id, power_state)
+            if driver.api.configured_entities.get(rt_id) is not None:
+                driver.api.configured_entities.update_attributes(rt_id, power_state)
             await sensor.update_light(device_id)
             await sensor.update_temp(device_id)
             await sensor.update_system(device_id)

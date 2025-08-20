@@ -226,12 +226,15 @@ All health sensor data (light source timer, temperature and error/warning) will 
 
 #### Limitations / Disclaimer
 
-_⚠️ This feature is currently only available in beta firmware releases and requires version 1.9.2 or newer. Please keep in mind that due to the beta status there are missing firmware features that require workarounds (see below)._
+_⚠️ This requires firmware version 1.9.2 or newer (installing firmware versions above 1.7.14 for Remote Two currently need beta updates to be enabled)._
 
 ##### Missing firmware features
 
 - The configuration file of custom integrations are not included in backups.
-- You currently can't update custom integrations. You need to delete the integration from the integrations menu first and then re-upload the new version. Do not edit any activity or macros that includes entities from this integration after you removed the integration and wait until the new version has been uploaded and installed. You also need to add re-add entities to the main pages after the update as they are automatically removed. An update function will probably be added once the custom integrations feature will be available in stable firmware releases.
+- You currently can't update custom integrations.
+  - As a workaround you first need to delete the integration twice until it's not shown anymore on the integration page and then re-upload and re-configure the new version
+  - Do not remove any entities exposed by this integration from any activity or macro after you removed the integration and wait until the new version has been uploaded and configured again
+  - You may also need to re-add entities to the main pages after the update as they are automatically removed. Your activities and macros will stay the same and will not need any reconfiguration.
 
 #### 1 - Download integration driver
 

@@ -17,8 +17,8 @@ _LOG = logging.getLogger(__name__)
 async def add_light_sensor(device_id: str):
     """Function to add a light source timer sensor entity with the config.LSTSensor class definition and get current light source hours"""
 
-    lt_name = config.Devices.get(device_id=device_id, key="lt-name")
-    lt_id = config.Devices.get(device_id=device_id, key="lt-id")
+    lt_name = config.Devices.get(device_id=device_id, key="sensor-light-name")
+    lt_id = config.Devices.get(device_id=device_id, key="sensor-light-id")
 
     definition = config.LSTSensor().get_def(ent_id=lt_id, name=lt_name)
 
@@ -31,8 +31,8 @@ async def add_light_sensor(device_id: str):
 async def remove_light_sensor(device_id: str):
     """Function to remove a light source timer sensor entity with the config.LSTSensor class definition and get current light source hours"""
 
-    lt_name = config.Devices.get(device_id=device_id, key="lt-name")
-    lt_id = config.Devices.get(device_id=device_id, key="lt-id")
+    lt_name = config.Devices.get(device_id=device_id, key="sensor-light-name")
+    lt_id = config.Devices.get(device_id=device_id, key="sensor-light-id")
 
     definition = config.LSTSensor().get_def(ent_id=lt_id, name=lt_name)
 
@@ -221,7 +221,11 @@ async def health_poller(device_id: str, interval:int) -> None:
 async def update_light(device_id: str):
     """Update light source timer sensor. Compare retrieved light source hours with the last sensor value from the remote and update it if necessary"""
 
-    lt_id = config.Devices.get(device_id=device_id, key="lt-id")
+    light_id = config.Devices.get(device_id=device_id, key="sensor-light-id")
+
+    if driver.api.configured_entities.get(light_id) is None:
+        _LOG.info(f"Entity {light_id} not found in configured entities. Skip updating attributes")
+        return True
 
     try:
         current_value = await projector.get_light_source_hours(device_id)
@@ -236,9 +240,9 @@ async def update_light(device_id: str):
         raise Exception(e) from e
 
     if stored_states != []:
-        attributes_stored = stored_states[1]["attributes"] # [1] = 2nd entity that has been added
+        attributes_stored = next((state["attributes"] for state in stored_states if state["entity_id"] == light_id),None)
     else:
-        raise Exception(f"Got empty states for {device_id} from remote. Please make sure to add configured entities")
+        raise Exception(f"Got empty states for {device_id} from remote")
 
     try:
         stored_value = attributes_stored["value"]
@@ -256,13 +260,10 @@ async def update_light(device_id: str):
         _LOG.debug(f"Light source hours for {device_id} have not changed since the last update. Skipping update process")
     else:
         try:
-            api_update_attributes = driver.api.configured_entities.update_attributes(lt_id, attributes_to_send)
+            driver.api.configured_entities.update_attributes(light_id, attributes_to_send)
         except Exception as e:
             _LOG.error(e)
-            raise Exception("Error while updating sensor value for entity id " + lt_id) from e
-
-        if not api_update_attributes:
-            raise Exception("Sensor entity " + lt_id + " not found. Please make sure it's added as a configured entity on the remote")
+            raise Exception("Error while updating sensor value for entity id " + light_id) from e
 
         _LOG.info(f"Updated light source timer for {device_id} sensor value to " + str(current_value))
 
@@ -272,20 +273,22 @@ async def update_temp(device_id: str):
     """Update projector temperature sensor. Compare retrieved temperature with the last sensor value from the remote and update it if necessary"""
 
     temp_id = config.Devices.get(device_id=device_id, key="sensor-temp-id")
+
+    if driver.api.configured_entities.get(temp_id) is None:
+        _LOG.info(f"Entity {temp_id} not found in configured entities. Skip updating attributes")
+        return True
+
     state = ucapi.sensor.States.UNAVAILABLE
 
+    current_value = "N/A"
     try:
         current_value = await projector.get_temp(device_id)
     except OSError as o:
         _LOG.info(o)
-        _LOG.info("Retuning N/A as value")
-        current_value = "N/A"
         _LOG.info("Set state to Unknown")
         state = ucapi.sensor.States.UNKNOWN #Better than unavailable as the UI shows the sensor as off wth an unknown state
     except NameError as n:
         _LOG.info(n)
-        _LOG.info("Retuning N/A as value")
-        current_value = "N/A"
         _LOG.info("Set state to Unknown")
         state = ucapi.sensor.States.UNKNOWN #Better than unavailable as the UI shows the sensor as off wth an unknown state
     except Exception as e:
@@ -299,9 +302,9 @@ async def update_temp(device_id: str):
         raise Exception(e) from e
 
     if stored_states != []:
-        attributes_stored = stored_states[2]["attributes"] # [2] = 3rd entity that has been added
+        attributes_stored = next((state["attributes"] for state in stored_states if state["entity_id"] == temp_id),None)
     else:
-        raise Exception(f"Got empty states for {device_id} from remote. Please make sure to add configured entities")
+        raise Exception(f"Got empty states for {device_id} from remote")
 
     try:
         stored_value = attributes_stored["value"]
@@ -321,13 +324,10 @@ async def update_temp(device_id: str):
         _LOG.debug(f"Temperature value for {device_id} has not changed since the last update. Skipping update process")
     else:
         try:
-            api_update_attributes = driver.api.configured_entities.update_attributes(temp_id, attributes_to_send)
+            driver.api.configured_entities.update_attributes(temp_id, attributes_to_send)
         except Exception as e:
             _LOG.error(e)
             raise Exception("Error while updating sensor value for entity id " + temp_id) from e
-
-        if not api_update_attributes:
-            raise Exception("Sensor entity " + temp_id + " not found. Please make sure it's added as a configured entity on the remote")
 
         _LOG.info(f"Updated temperature value for {device_id} sensor value to " + str(current_value))
 
@@ -337,6 +337,10 @@ async def update_system(device_id: str):
     """Update system status sensor. Compare retrieved messages with the last messages from the remote and update it if necessary"""
 
     system_id = config.Devices.get(device_id=device_id, key="sensor-system-id")
+
+    if driver.api.configured_entities.get(system_id) is None:
+        _LOG.info(f"Entity {system_id} not found in configured entities. Skip updating attributes")
+        return True
 
     try:
         err_msg = await projector.get_error(device_id)
@@ -353,9 +357,9 @@ async def update_system(device_id: str):
         raise Exception(e) from e
 
     if stored_states != []:
-        attributes_stored = stored_states[3]["attributes"] # [3] = 4th entity that has been added
+        attributes_stored = next((state["attributes"] for state in stored_states if state["entity_id"] == system_id),None)
     else:
-        raise Exception(f"Got empty states for {device_id} from remote. Please make sure to add configured entities")
+        raise Exception(f"Got empty states for {device_id} from remote")
 
     try:
         stored_value = attributes_stored["value"]
@@ -373,13 +377,10 @@ async def update_system(device_id: str):
         _LOG.debug(f"Temperature value for {device_id} has not changed since the last update. Skipping update process")
     else:
         try:
-            api_update_attributes = driver.api.configured_entities.update_attributes(system_id, attributes_to_send)
+            driver.api.configured_entities.update_attributes(system_id, attributes_to_send)
         except Exception as e:
             _LOG.error(e)
             raise Exception("Error while updating sensor value for entity id " + system_id) from e
-
-        if not api_update_attributes:
-            raise Exception("Sensor entity " + system_id + " not found. Please make sure it's added as a configured entity on the remote")
 
         _LOG.info(f"Updated error and warning messages for {device_id} sensor value to " + str(current_value))
 
@@ -389,6 +390,11 @@ async def update_video(device_id: str):
     """Update video info sensor"""
 
     sensor_video_id = config.Devices.get(device_id=device_id, key="sensor-video-id")
+
+    if driver.api.configured_entities.get(sensor_video_id) is None:
+        _LOG.info(f"Entity {sensor_video_id} not found in configured entities. Skip updating attributes")
+        return True
+
     no_signal = False
     muted = False
     state = ucapi.sensor.States.UNAVAILABLE
@@ -409,10 +415,9 @@ async def update_video(device_id: str):
             if resolution == "Invalid":
                 resolution = "No signal"
                 no_signal = True
-        except Exception as e:
+        except Exception:
             _LOG.warning(f"Failed to get video resolution from {device_id}")
             resolution = "Error"
-            raise Exception(e) from e
 
         if no_signal:
             video_info = resolution
@@ -420,31 +425,27 @@ async def update_video(device_id: str):
         else:
             try:
                 dyn_range = await projector.get_dynamic_range(device_id)
-            except Exception as e:
-                _LOG.warning(f"Failed to get color space from {device_id}")
+            except Exception:
+                _LOG.warning(f"Failed to get dynamic range from {device_id}")
                 dyn_range = "Error"
-                raise Exception(e) from e
 
             try:
                 color_space = await projector.get_color_space(device_id)
-            except Exception as e:
+            except Exception:
                 _LOG.warning(f"Failed to get color space from {device_id}")
                 color_space = "Error"
-                raise Exception(e) from e
 
             try:
                 color_format = await projector.get_color_format(device_id)
-            except Exception as e:
+            except Exception:
                 _LOG.warning(f"Failed to get color format from {device_id}")
                 color_format = "Error"
-                raise Exception(e) from e
 
             try:
                 mode_2d_3d = await projector.get_mode_2d_3d(device_id)
-            except Exception as e:
+            except Exception:
                 _LOG.warning(f"Failed to get 2d/3d mode from {device_id}")
                 mode_2d_3d = "Error"
-                raise Exception(e) from e
 
             if resolution == "Error" or dyn_range == "Error" or color_space == "Error" or color_format == "Error" or mode_2d_3d == "Error":
                 _LOG.warning(f"Couldn't get (some) video infos for {device_id}. Set sensor state to Unknown")
@@ -457,12 +458,9 @@ async def update_video(device_id: str):
     attributes_to_send = {ucapi.sensor.Attributes.STATE: state, ucapi.sensor.Attributes.VALUE: video_info}
 
     try:
-        api_update_attributes = driver.api.configured_entities.update_attributes(sensor_video_id , attributes_to_send)
+        driver.api.configured_entities.update_attributes(sensor_video_id , attributes_to_send)
     except Exception as e:
         _LOG.error(e)
         raise Exception("Error while updating sensor value for entity id " + sensor_video_id ) from e
-
-    if not api_update_attributes:
-        raise Exception("Sensor entity " + sensor_video_id  + " not found. Please make sure it's added as a configured entity on the remote")
 
     _LOG.info(f"Updated video signal infos for {device_id} sensor value to " + str(video_info))

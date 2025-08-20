@@ -39,8 +39,8 @@ async def startcheck():
         for device_id in config.Devices.list():
             try:
                 mp_entity_id = device_id
-                rt_entity_id = config.Devices.get(device_id=device_id, key="rt-id")
-                sensor_light_entity_id = config.Devices.get(device_id=device_id, key="lt-id")
+                rt_entity_id = config.Devices.get(device_id=device_id, key="remote-id")
+                sensor_light_entity_id = config.Devices.get(device_id=device_id, key="sensor-light-id")
                 sensor_video_entity_id = config.Devices.get(device_id=device_id, key="sensor-video-id")
                 sensor_temp_entity_id = config.Devices.get(device_id=device_id, key="sensor-temp-id")
                 sensor_system_entity_id = config.Devices.get(device_id=device_id, key="sensor-system-id")
@@ -125,7 +125,6 @@ async def on_r2_enter_standby() -> None:
     """
     _LOG.info("Received enter standby event message from remote")
 
-    _LOG.debug("Set config.R2_IN_STANDBY to True")
     config.Setup.set("standby", True)
 
 
@@ -139,7 +138,6 @@ async def on_r2_exit_standby() -> None:
     """
     _LOG.info("Received exit standby event message from remote")
 
-    _LOG.debug("Set config.R2_IN_STANDBY to False")
     config.Setup.set("standby", False)
 
 
@@ -164,8 +162,8 @@ async def on_subscribe_entities(entity_ids: list[str]) -> None:
                 device_ids.append(entity_id)
 
         if not device_ids:
-            _LOG.error("No valid device ids found in entity ids list from entity subscribe message")
-            _LOG.warning("Please add at least the media player entity of a device as a configured entity")
+            _LOG.info("No valid device ids found in entity ids list from entity subscribe message")
+            #It might be just a single entity that has been subscribed to, which is not a media player entity and therefore the device id can't be determined
             _LOG.info("Skip starting poller tasks and update of attributes and poller")
         else:
             for device_id in device_ids:
@@ -176,7 +174,7 @@ async def on_subscribe_entities(entity_ids: list[str]) -> None:
                 await media_player.update_mp(device_id)
                 await media_player.MpPollerController.start(device_id)
 
-                rt_id = config.Devices.get(device_id=device_id, key="rt-id")
+                rt_id = config.Devices.get(device_id=device_id, key="remote-id")
                 sensor_video_id = config.Devices.get(device_id=device_id, key="sensor-video-id")
 
                 if rt_id in entity_ids:
@@ -209,7 +207,7 @@ async def on_subscribe_entities(entity_ids: list[str]) -> None:
                 else:
                     _LOG.debug(f"Video sensor entity for device {device_id} is not in the configured entities. Skip updating attributes")
 
-                if config.Devices.get(device_id=device_id, key="lt-id") in entity_ids:
+                if config.Devices.get(device_id=device_id, key="sensor-light-id") in entity_ids:
                     await sensor.update_light(device_id)
                     sensor_light = True
                 if config.Devices.get(device_id=device_id, key="sensor-temp-id") in entity_ids:
@@ -242,8 +240,8 @@ async def on_unsubscribe_entities(entity_ids: list[str]) -> None:
 
     for entity_id in entity_ids:
         mp_entity_id= config.Devices.get(device_id=entity_id, key="id")
-        rt_entity_id = config.Devices.get(device_id=entity_id, key="rt-id")
-        sensor_light_entity_id = config.Devices.get(device_id=entity_id, key="lt-id")
+        rt_entity_id = config.Devices.get(device_id=entity_id, key="remote-id")
+        sensor_light_entity_id = config.Devices.get(device_id=entity_id, key="sensor-light-id")
         sensor_video_entity_id = config.Devices.get(device_id=entity_id, key="sensor-video-id")
         sensor_temp_entity_id = config.Devices.get(device_id=entity_id, key="sensor-temp-id")
         sensor_system_entity_id = config.Devices.get(device_id=entity_id, key="sensor-system-id")

@@ -21,8 +21,8 @@ _LOG = logging.getLogger(__name__)
 async def add_remote(device_id: str):
     """Function to add a remote entity"""
 
-    rt_name = config.Devices.get(device_id=device_id, key="name")
-    rt_id = config.Devices.get(device_id=device_id, key="rt-id")
+    rt_name = config.Devices.get(device_id=device_id, key="remote-name")
+    rt_id = config.Devices.get(device_id=device_id, key="remote-id")
 
     definition = config.Remote().get_def(ent_id=rt_id, name=rt_name)
 
@@ -35,8 +35,8 @@ async def add_remote(device_id: str):
 async def remove_remote(device_id: str):
     """Function to remove a remote entity"""
 
-    rt_name = config.Devices.get(device_id=device_id, key="name")
-    rt_id = config.Devices.get(device_id=device_id, key="rt-id")
+    rt_name = config.Devices.get(device_id=device_id, key="remote-name")
+    rt_id = config.Devices.get(device_id=device_id, key="remote-id")
 
     definition = config.Remote().get_def(ent_id=rt_id, name=rt_name)
 
@@ -58,11 +58,11 @@ async def update_rt(device_id: str):
 
     try:
         api_update_attributes = driver.api.configured_entities.update_attributes(device_id, power)
+        if not api_update_attributes:
+            driver.api.available_entities.update_attributes(device_id, power)
     except Exception as e:
         raise Exception("Error while updating status attribute for entity id " + device_id) from e
 
-    if not api_update_attributes:
-        raise Exception("Entity " + device_id + " not found. Please make sure it's added as a configured entity on the remote")
     _LOG.info("Updated remote entity status attribute to " + str(power) + " for " + device_id)
 
 
@@ -127,7 +127,7 @@ async def remote_cmd_handler(
             except Exception as e:
                 error = str(e)
                 if error is not None:
-                    _LOG.error(f"Failed to send command {command}: {error}")
+                    _LOG.error(f"Failed to send command {cmd_id}: {error}")
                 return ucapi.StatusCodes.BAD_REQUEST
             return ucapi.StatusCodes.OK
 
