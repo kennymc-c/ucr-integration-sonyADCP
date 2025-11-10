@@ -51,7 +51,7 @@ async def get_attr_power(device_id: str):
         power_state = await projector_def(device_id).command(ADCP.Get.POWER)
     except Exception as e:
         raise type(e)(str(e)) from e
-    if power_state in (ADCP.Values.States.STANDBY, ADCP.Values.States.COOLING1, ADCP.Values.States.COOLING1):
+    if power_state in (ADCP.Values.States.STANDBY, ADCP.Values.States.COOLING1, ADCP.Values.States.COOLING2):
         #TODO Test if UC standby status is really shown in the remote ui and not only part of the ucapi, If so create a separate case
         return {ucapi.media_player.Attributes.STATE: ucapi.media_player.States.OFF} #Can be used for remote entities as well
     if power_state in (ADCP.Values.States.ON, ADCP.Values.States.STARTUP):
@@ -355,7 +355,7 @@ async def update_attributes(device_id:str , cmd_name:str):
     """Update media player, remote and sensor entity attributes and values if the command changes or could potentially change these attributes or values"""
 
     mp_id = device_id
-    rt_id = mp_id
+    rt_id = config.Devices.get(device_id=device_id, key="remote-id")
 
     match cmd_name:
 
@@ -372,7 +372,7 @@ async def update_attributes(device_id:str , cmd_name:str):
                 await media_player.update_video(device_id)
             except Exception as e:
                 raise type(e)(str(e))
-            _LOG.info("Media player power status attribute set to \"ON\"")
+            _LOG.info("Media player and remote entity power status attribute set to \"ON\"")
 
         case ucapi.media_player.Commands.OFF:
             try:
@@ -387,18 +387,16 @@ async def update_attributes(device_id:str , cmd_name:str):
                 await media_player.update_video(device_id)
             except Exception as e:
                 raise type(e)(str(e))
-            _LOG.info("Media player power status attribute set to \"OFF\"")
+            _LOG.info("Media player and remote entity power status attribute set to \"OFF\"")
 
         case ucapi.media_player.Commands.TOGGLE:
+            await driver.asyncio.sleep(3)  # Wait 3 seconds for the projector to report the correct power state
             try:
                 power_state = await get_attr_power(device_id)
             except Exception as e:
                 _LOG.error(e)
                 _LOG.warning("Couldn't get power state. Set to unknown")
-                if driver.api.configured_entities.get(mp_id) is not None:
-                    driver.api.configured_entities.update_attributes(mp_id, {ucapi.media_player.Attributes.STATE: ucapi.media_player.States.UNKNOWN})
-                if driver.api.configured_entities.get(rt_id) is not None:
-                    driver.api.configured_entities.update_attributes(rt_id, {ucapi.remote.Attributes.STATE: ucapi.remote.States.UNKNOWN})
+                power_state = {ucapi.media_player.Attributes.STATE: ucapi.media_player.States.UNKNOWN}
 
             if driver.api.configured_entities.get(mp_id) is not None:
                 driver.api.configured_entities.update_attributes(mp_id, power_state)

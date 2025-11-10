@@ -134,6 +134,8 @@ async def remote_cmd_handler(
         case \
             ucapi.remote.Commands.SEND_CMD:
 
+            #TODO Optimize send_cmd and send_cmd_sequence similar to requests integration
+
             command = params.get("command")
 
             try:
