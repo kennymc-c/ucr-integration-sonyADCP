@@ -18,7 +18,7 @@ _LOG = logging.getLogger(__name__)
 
 
 
-async def add_remote(device_id: str):
+async def add(device_id: str):
     """Function to add a remote entity"""
 
     rt_name = config.Devices.get(device_id=device_id, key="remote-name")
@@ -32,7 +32,7 @@ async def add_remote(device_id: str):
 
 
 
-async def remove_remote(device_id: str):
+async def remove(device_id: str):
     """Function to remove a remote entity"""
 
     rt_name = config.Devices.get(device_id=device_id, key="remote-name")
@@ -46,7 +46,7 @@ async def remove_remote(device_id: str):
 
 
 
-async def update_rt(device_id: str):
+async def update(device_id: str):
     """Retrieve input source, power status and muted status from the projector, compare them with the known status on the remote and update them if necessary"""
 
     try:
@@ -67,7 +67,7 @@ async def update_rt(device_id: str):
 
 
 
-async def remote_cmd_handler(
+async def cmd_handler(
     entity: ucapi.Remote, cmd_id: str, params: dict[str, Any] | None
 ) -> ucapi.StatusCodes:
     """
@@ -267,26 +267,32 @@ def create_ui_pages() -> list[ucapi.ui.UiPage | dict[str, Any]]:
     ui_page1.add(ucapi.ui.create_ui_text("HDMI 1", 0, 1, size=ucapi.ui.Size(3, 1), cmd=ucapi.remote.create_send_cmd(config.SimpleCommands.INPUT_HDMI1)))
     ui_page1.add(ucapi.ui.create_ui_text("HDMI 2", 3, 1, size=ucapi.ui.Size(3, 1), cmd=ucapi.remote.create_send_cmd(config.SimpleCommands.INPUT_HDMI2)))
     ui_page1.add(ucapi.ui.create_ui_text("-- HDR --", 0, 2, size=ucapi.ui.Size(6, 1)))
-    ui_page1.add(ucapi.ui.create_ui_text("On", 0, 3, size=ucapi.ui.Size(2, 1), cmd=ucapi.remote.create_send_cmd(config.SimpleCommands.MODE_HDR_ON)))
-    ui_page1.add(ucapi.ui.create_ui_text("Off", 2, 3, size=ucapi.ui.Size(2, 1), cmd=ucapi.remote.create_send_cmd(config.SimpleCommands.MODE_HDR_OFF)))
-    ui_page1.add(ucapi.ui.create_ui_text("Auto", 4, 3, size=ucapi.ui.Size(2, 1), cmd=ucapi.remote.create_send_cmd(config.SimpleCommands.MODE_HDR_AUTO)))
+    ui_page1.add(ucapi.ui.create_ui_text("On", 0, 3, size=ucapi.ui.Size(1, 1), cmd=ucapi.remote.create_send_cmd(config.SimpleCommands.MODE_HDR_ON)))
+    ui_page1.add(ucapi.ui.create_ui_text("Off", 1, 3, size=ucapi.ui.Size(1, 1), cmd=ucapi.remote.create_send_cmd(config.SimpleCommands.MODE_HDR_OFF)))
+    ui_page1.add(ucapi.ui.create_ui_text("Auto", 2, 3, size=ucapi.ui.Size(1, 1), cmd=ucapi.remote.create_send_cmd(config.SimpleCommands.MODE_HDR_AUTO)))
+    ui_page1.add(ucapi.ui.create_ui_text("HDR10", 3, 3, size=ucapi.ui.Size(1, 1), cmd=ucapi.remote.create_send_cmd(config.SimpleCommands.MODE_HDR_HDR10)))
+    ui_page1.add(ucapi.ui.create_ui_text("HDR Ref", 4, 3, size=ucapi.ui.Size(1, 1), cmd=ucapi.remote.create_send_cmd(config.SimpleCommands.MODE_HDR_HDR_REF)))
+    ui_page1.add(ucapi.ui.create_ui_text("HLG", 5, 3, size=ucapi.ui.Size(1, 1), cmd=ucapi.remote.create_send_cmd(config.SimpleCommands.MODE_HDR_HLG)))
     ui_page1.add(ucapi.ui.create_ui_text("-- HDR Dynamic Tone Mapping --", 0, 4, size=ucapi.ui.Size(6, 1)))
     ui_page1.add(ucapi.ui.create_ui_text("Off", 1, 5, size=ucapi.ui.Size(1, 1), cmd=ucapi.remote.create_send_cmd(config.SimpleCommands.MODE_HDR_DYN_TONE_MAPPING_OFF)))
     ui_page1.add(ucapi.ui.create_ui_text("Mode 1", 2, 5, size=ucapi.ui.Size(1, 1), cmd=ucapi.remote.create_send_cmd(config.SimpleCommands.MODE_HDR_DYN_TONE_MAPPING_1)))
     ui_page1.add(ucapi.ui.create_ui_text("Mode 2", 3, 5, size=ucapi.ui.Size(1, 1), cmd=ucapi.remote.create_send_cmd(config.SimpleCommands.MODE_HDR_DYN_TONE_MAPPING_2)))
     ui_page1.add(ucapi.ui.create_ui_text("Mode 3", 4, 5, size=ucapi.ui.Size(1, 1), cmd=ucapi.remote.create_send_cmd(config.SimpleCommands.MODE_HDR_DYN_TONE_MAPPING_3)))
 
-    ui_page2 = ucapi.ui.UiPage("page2", "Picture Modes")
-    ui_page2.add(ucapi.ui.create_ui_text("-- Picture Modes --", 0, 0, size=ucapi.ui.Size(4, 1)))
-    ui_page2.add(ucapi.ui.create_ui_text("Cinema Film 1", 0, 1, size=ucapi.ui.Size(2, 1), cmd=ucapi.remote.create_send_cmd(config.SimpleCommands.MODE_PRESET_CINEMA_FILM_1)))
-    ui_page2.add(ucapi.ui.create_ui_text("Cinema Film 2", 2, 1, size=ucapi.ui.Size(2, 1), cmd=ucapi.remote.create_send_cmd(config.SimpleCommands.MODE_PRESET_CINEMA_FILM_2)))
-    ui_page2.add(ucapi.ui.create_ui_text("Reference", 0, 2, size=ucapi.ui.Size(2, 1), cmd=ucapi.remote.create_send_cmd(config.SimpleCommands.MODE_PRESET_REF)))
-    ui_page2.add(ucapi.ui.create_ui_text("Game", 2, 2, size=ucapi.ui.Size(2, 1), cmd=ucapi.remote.create_send_cmd(config.SimpleCommands.MODE_PRESET_GAME)))
-    ui_page2.add(ucapi.ui.create_ui_text("TV", 0, 3, size=ucapi.ui.Size(2, 1), cmd=ucapi.remote.create_send_cmd(config.SimpleCommands.MODE_PRESET_TV)))
-    ui_page2.add(ucapi.ui.create_ui_text("Bright TV", 2, 3, size=ucapi.ui.Size(2, 1), cmd=ucapi.remote.create_send_cmd(config.SimpleCommands.MODE_PRESET_BRIGHT_TV)))
-    ui_page2.add(ucapi.ui.create_ui_text("Bright Cinema", 0, 4, size=ucapi.ui.Size(2, 1), cmd=ucapi.remote.create_send_cmd(config.SimpleCommands.MODE_PRESET_BRIGHT_CINEMA)))
-    ui_page2.add(ucapi.ui.create_ui_text("Photo", 2, 4, size=ucapi.ui.Size(2, 1), cmd=ucapi.remote.create_send_cmd(config.SimpleCommands.MODE_PRESET_PHOTO)))
-    ui_page2.add(ucapi.ui.create_ui_text("User", 1, 5, size=ucapi.ui.Size(2, 1), cmd=ucapi.remote.create_send_cmd(config.SimpleCommands.MODE_PRESET_USER)))
+    ui_page2 = ucapi.ui.UiPage("page2", "Picture Modes", grid=ucapi.ui.Size(6, 6))
+    ui_page2.add(ucapi.ui.create_ui_text("-- Picture Modes --", 0, 0, size=ucapi.ui.Size(6, 1)))
+    ui_page2.add(ucapi.ui.create_ui_text("Cinema Film 1", 0, 1, size=ucapi.ui.Size(3, 1), cmd=ucapi.remote.create_send_cmd(config.SimpleCommands.MODE_PRESET_CINEMA_FILM_1)))
+    ui_page2.add(ucapi.ui.create_ui_text("Cinema Film 2", 2, 1, size=ucapi.ui.Size(3, 1), cmd=ucapi.remote.create_send_cmd(config.SimpleCommands.MODE_PRESET_CINEMA_FILM_2)))
+    ui_page2.add(ucapi.ui.create_ui_text("Reference", 0, 2, size=ucapi.ui.Size(3, 1), cmd=ucapi.remote.create_send_cmd(config.SimpleCommands.MODE_PRESET_REF)))
+    ui_page2.add(ucapi.ui.create_ui_text("Game", 2, 2, size=ucapi.ui.Size(3, 1), cmd=ucapi.remote.create_send_cmd(config.SimpleCommands.MODE_PRESET_GAME)))
+    ui_page2.add(ucapi.ui.create_ui_text("TV", 0, 3, size=ucapi.ui.Size(3, 1), cmd=ucapi.remote.create_send_cmd(config.SimpleCommands.MODE_PRESET_TV)))
+    ui_page2.add(ucapi.ui.create_ui_text("Bright TV", 2, 3, size=ucapi.ui.Size(3, 1), cmd=ucapi.remote.create_send_cmd(config.SimpleCommands.MODE_PRESET_BRIGHT_TV)))
+    ui_page2.add(ucapi.ui.create_ui_text("Bright Cinema", 0, 4, size=ucapi.ui.Size(3, 1), cmd=ucapi.remote.create_send_cmd(config.SimpleCommands.MODE_PRESET_BRIGHT_CINEMA)))
+    ui_page2.add(ucapi.ui.create_ui_text("Photo", 2, 4, size=ucapi.ui.Size(3, 1), cmd=ucapi.remote.create_send_cmd(config.SimpleCommands.MODE_PRESET_PHOTO)))
+    ui_page2.add(ucapi.ui.create_ui_text("User", 0, 5, size=ucapi.ui.Size(3, 1), cmd=ucapi.remote.create_send_cmd(config.SimpleCommands.MODE_PRESET_USER)))
+    ui_page2.add(ucapi.ui.create_ui_text("User1", 3, 5, size=ucapi.ui.Size(1, 1), cmd=ucapi.remote.create_send_cmd(config.SimpleCommands.MODE_PRESET_USER1)))
+    ui_page2.add(ucapi.ui.create_ui_text("User2", 4, 5, size=ucapi.ui.Size(1, 1), cmd=ucapi.remote.create_send_cmd(config.SimpleCommands.MODE_PRESET_USER2)))
+    ui_page2.add(ucapi.ui.create_ui_text("User3", 5, 5, size=ucapi.ui.Size(1, 1), cmd=ucapi.remote.create_send_cmd(config.SimpleCommands.MODE_PRESET_USER3)))
 
     ui_page3 = ucapi.ui.UiPage("page3", "Aspect Ratios")
     ui_page3.add(ucapi.ui.create_ui_text("-- Aspect Ratios --", 0, 0, size=ucapi.ui.Size(4, 1)))

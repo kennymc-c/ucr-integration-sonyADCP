@@ -32,6 +32,9 @@ class SimpleCommands (str, Enum):
     INPUT_HDMI2 =                                               "INPUT_HDMI_2"
     MODE_PRESET_REF =                                           "MODE_PIC_REF"
     MODE_PRESET_USER =                                          "MODE_PIC_USER"
+    MODE_PRESET_USER1 =                                         "MODE_PIC_USER1"
+    MODE_PRESET_USER2 =                                         "MODE_PIC_USER2"
+    MODE_PRESET_USER3 =                                         "MODE_PIC_USER3"
     MODE_PRESET_TV =                                            "MODE_PIC_TV"
     MODE_PRESET_PHOTO =                                         "MODE_PIC_PHOTO"
     MODE_PRESET_GAME =                                          "MODE_PIC_GAME"
@@ -54,6 +57,9 @@ class SimpleCommands (str, Enum):
     MODE_HDR_ON =                                               "MODE_HDR_ON"
     MODE_HDR_OFF =                                              "MODE_HDR_OFF"
     MODE_HDR_AUTO =                                             "MODE_HDR_AUTO"
+    MODE_HDR_HDR10 =                                            "MODE_HDR_HDR10"
+    MODE_HDR_HDR_REF =                                          "MODE_HDR_HDR_REF"
+    MODE_HDR_HLG =                                              "MODE_HDR_HLG"
     MODE_HDR_DYN_TONE_MAPPING_1 =                               "MODE_HDR_TONEMAP_1"
     MODE_HDR_DYN_TONE_MAPPING_2 =                               "MODE_HDR_TONEMAP_2"
     MODE_HDR_DYN_TONE_MAPPING_3 =                               "MODE_HDR_TONEMAP_3"
@@ -103,6 +109,7 @@ class SimpleCommands (str, Enum):
     MENU_POSITION_CENTER =                                      "MENU_POS_CENTER"
     UPDATE_VIDEO_INFO =                                         "UPDATE_VIDEO_INFO"
     UPDATE_HEALTH_STATUS =                                      "UPDATE_HEALTH_STATUS"
+    UPDATE_SETTING_SENSORS =                                    "UPDATE_SETTING_SENS"
 
 
 
@@ -149,6 +156,9 @@ class UC2ADCP:
         SimpleCommands.MODE_PRESET_PHOTO: f"{ADCP.Commands.PICTURE_MODE.value} {ADCP.Values.PictureModes.PHOTO.value}",
         SimpleCommands.MODE_PRESET_GAME: f"{ADCP.Commands.PICTURE_MODE.value} {ADCP.Values.PictureModes.GAME.value}",
         SimpleCommands.MODE_PRESET_USER: f"{ADCP.Commands.PICTURE_MODE.value} {ADCP.Values.PictureModes.USER.value}",
+        SimpleCommands.MODE_PRESET_USER1: f"{ADCP.Commands.PICTURE_MODE.value} {ADCP.Values.PictureModes.USER1.value}",
+        SimpleCommands.MODE_PRESET_USER2: f"{ADCP.Commands.PICTURE_MODE.value} {ADCP.Values.PictureModes.USER2.value}",
+        SimpleCommands.MODE_PRESET_USER3: f"{ADCP.Commands.PICTURE_MODE.value} {ADCP.Values.PictureModes.USER3.value}",
         SimpleCommands.MODE_ASPECT_RATIO_NORMAL: f"{ADCP.Commands.ASPECT.value} {ADCP.Values.Aspect.NORMAL.value}",
         SimpleCommands.MODE_ASPECT_RATIO_V_STRETCH: f"{ADCP.Commands.ASPECT.value} {ADCP.Values.Aspect.V_STRETCH.value}",
         SimpleCommands.MODE_ASPECT_RATIO_ZOOM_1_85: f"{ADCP.Commands.ASPECT.value} {ADCP.Values.Aspect.ZOOM_1_85.value}",
@@ -164,6 +174,9 @@ class UC2ADCP:
         SimpleCommands.MODE_HDR_ON: f"{ADCP.Commands.HDR.value} {ADCP.Values.HDR.ON.value}",
         SimpleCommands.MODE_HDR_OFF: f"{ADCP.Commands.HDR.value} {ADCP.Values.HDR.OFF.value}",
         SimpleCommands.MODE_HDR_AUTO: f"{ADCP.Commands.HDR.value} {ADCP.Values.HDR.AUTO.value}",
+        SimpleCommands.MODE_HDR_HDR10: f"{ADCP.Commands.HDR.value} {ADCP.Values.HDR.HDR10.value}",
+        SimpleCommands.MODE_HDR_HDR_REF: f"{ADCP.Commands.HDR.value} {ADCP.Values.HDR.HDR_REF.value}",
+        SimpleCommands.MODE_HDR_HLG: f"{ADCP.Commands.HDR.value} {ADCP.Values.HDR.HLG.value}",
         SimpleCommands.MODE_HDR_DYN_TONE_MAPPING_1: f"{ADCP.Commands.HDR_DYN_TONE_MAPPING.value} {ADCP.Values.HDRDynToneMapping.MODE_1.value}",
         SimpleCommands.MODE_HDR_DYN_TONE_MAPPING_2: f"{ADCP.Commands.HDR_DYN_TONE_MAPPING.value} {ADCP.Values.HDRDynToneMapping.MODE_2.value}",
         SimpleCommands.MODE_HDR_DYN_TONE_MAPPING_3: f"{ADCP.Commands.HDR_DYN_TONE_MAPPING.value} {ADCP.Values.HDRDynToneMapping.MODE_3.value}",
@@ -200,6 +213,22 @@ class UC2ADCP:
         SimpleCommands.INPUT_LAG_REDUCTION_OFF: f"{ADCP.Commands.INPUT_LAG.value} {ADCP.Values.States.OFF.value}",
         SimpleCommands.MENU_POSITION_BOTTOM_LEFT: f"{ADCP.Commands.MENU_POSITION.value} {ADCP.Values.MenuPosition.BOTTOM_LEFT.value}",
         SimpleCommands.MENU_POSITION_CENTER: f"{ADCP.Commands.MENU_POSITION.value} {ADCP.Values.MenuPosition.CENTER.value}",
+        #Setting sensors
+        "power-status" : f"{ADCP.Get.POWER.value}",
+        "picture-muting": f"{ADCP.Get.MUTE.value}",
+        "picture-preset" : f"{ADCP.Get.PICTURE_MODE.value}",
+        "aspect" : f"{ADCP.Get.ASPECT.value}",
+        "picture-position": f"{ADCP.Get.PICTURE_POSITION.value}",
+        "hdr-status" : f"{ADCP.Get.HDR.value}",
+        "hdr-dynamic-tone-mapping" : f"{ADCP.Get.HDR_DYN_TONE_MAPPING.value}",
+        "lamp-control": f"{ADCP.Get.LAMP_CONTROL.value}",
+        "dynamic-iris-control" : f"{ADCP.Get.DYN_IRIS_CONTROL.value}",
+        "dynamic-light-control": f"{ADCP.Get.DYN_LIGHT_CONTROL.value}",
+        "motionflow" : f"{ADCP.Get.MOTIONFLOW.value}",
+        "2d/3d-mode" : f"{ADCP.Get.MODE_2D_3D.value}",
+        "3d-format" : f"{ADCP.Get.MODE_3D_FORMAT.value}",
+        "input-lag-reduction" : f"{ADCP.Get.INPUT_LAG_REDUCTION.value}",
+        "menu-position" : f"{ADCP.Get.MENU_POSITION.value}",
     }
 
     @staticmethod
@@ -255,7 +284,7 @@ class MediaPlayer():
             attributes=MediaPlayer._attributes,
             device_class=MediaPlayer._device_class,
             options=MediaPlayer._options,
-            cmd_handler=media_player.mp_cmd_handler
+            cmd_handler=media_player.cmd_handler
             )
 
         return definition
@@ -285,104 +314,7 @@ class Remote:
             simple_commands=Remote._simple_commands,
             button_mapping=remote.create_button_mappings(),
             ui_pages=remote.create_ui_pages(),
-            cmd_handler=remote.remote_cmd_handler,
-        )
-
-        return definition
-
-
-
-class LSTSensor:
-    """Light source timer sensor entity definition class that includes the device class, attributes and options"""
-
-    _device_class = ucapi.sensor.DeviceClasses.CUSTOM
-    _attributes = {
-        ucapi.sensor.Attributes.STATE: ucapi.sensor.States.ON,
-        ucapi.sensor.Attributes.UNIT: "h"
-        }
-    _options = {
-        ucapi.sensor.Options.CUSTOM_UNIT: "h"
-        }
-
-    def get_def(self, ent_id: str, name: str):
-        """Returns the light source timer sensor entity definition for the api call"""
-
-        definition = ucapi.Sensor(
-            ent_id,
-            name,
-            features=None, #Mandatory although sensor entities have no features
-            attributes=self._attributes,
-            device_class=self._device_class,
-            options=self._options
-        )
-
-        return definition
-
-
-
-class VISensor:
-    """Video info sensor entity definition class that includes the device class, attributes and options"""
-
-    _device_class = ucapi.sensor.DeviceClasses.CUSTOM
-    _attributes = {
-        ucapi.sensor.Attributes.STATE: ucapi.sensor.States.ON,
-        }
-
-    def get_def(self, ent_id: str, name: str):
-        """Returns the video info sensor entity definition for the api call"""
-
-        definition = ucapi.Sensor(
-            ent_id,
-            name,
-            features=None, #Mandatory although sensor entities have no features
-            attributes=self._attributes,
-            device_class=self._device_class,
-        )
-
-        return definition
-
-
-
-class TEMPSensor:
-    """Temperature sensor entity definition class that includes the device class, attributes and options"""
-
-    _device_class = ucapi.sensor.DeviceClasses.TEMPERATURE
-    _attributes = {
-        ucapi.sensor.Attributes.STATE: ucapi.sensor.States.ON,
-        }
-
-    def get_def(self, ent_id: str, name: str):
-        """Returns the temperature sensor entity definition for the api call"""
-
-        definition = ucapi.Sensor(
-            ent_id,
-            name,
-            features=None, #Mandatory although sensor entities have no features
-            attributes=self._attributes,
-            device_class=self._device_class,
-        )
-
-        return definition
-
-
-
-class SYSTEMSensor:
-    """System status sensor entity definition class that includes the device class, attributes and options"""
-
-    _device_class = ucapi.sensor.DeviceClasses.CUSTOM
-    _attributes = {
-        ucapi.sensor.Attributes.STATE: ucapi.sensor.States.ON,
-        }
-
-    def get_def(self, ent_id: str, name: str):
-        """Returns the temperature sensor entity definition for the api call"""
-
-        definition = ucapi.Sensor(
-            ent_id,
-            name,
-            features=None, #Mandatory although sensor entities have no features
-            attributes=self._attributes,
-            device_class=self._device_class,
+            cmd_handler=remote.cmd_handler,
         )
 
         return definition
@@ -449,6 +381,12 @@ class Setup:
         "default_sdap_port": 53862,
         "default_mp_poller_interval": 20,  # Use 0 to deactivate; will be automatically set to 0 when running on the remote (bundle_mode: True)
         "default_health_poller_interval": 1800,  # Use 0 to deactivate
+        "sensor_types": \
+            {"light", "video", "temp", "system", \
+            #Setting sensors
+            "power-status", "picture-muting", "picture-preset", "aspect", "picture-position", "hdr-status", "hdr-dynamic-tone-mapping", "lamp-control",\
+            "dynamic-iris-control", "dynamic-light-control", "motionflow", "2d/3d-mode", "3d-format", "input-lag-reduction", "menu-position",
+            },
     }
     __setters = ["setup_complete", "setup_reconfigure", "setup_step", "setup_auto_discovery", "setup_reconfigure_device", \
                  "standby", "bundle_mode", "cfg_path", "default_mp_poller_interval", "default_health_poller_interval"]
@@ -720,6 +658,7 @@ class Devices:
         _LOG.info("Generate remote id and sensor entity ids and names")
 
         name = Devices.get(device_id=device_id, key="name")
+        data = {}
 
         remote_entity_id = "remote-" + device_id
         remote_entity_name = {
@@ -751,12 +690,18 @@ class Devices:
             "de": "System-Status " + name
         }
 
-        data = {"remote-id": remote_entity_id, "remote-name": remote_entity_name, \
+        sensors = Setup.get("sensor_types")
+        for sensor in sensors:
+            sensor_name = sensor.replace("-", " ").title().replace("Hdr", "HDR").replace("2d/3d", "2D/3D").replace("3d", "3D")
+            data.update({f"sensor-{sensor}-id" : f"sensor-{sensor}-{device_id}", f"sensor-{sensor}-name" : f"{sensor_name} {name}"})
+
+        data.update({"remote-id": remote_entity_id, "remote-name": remote_entity_name, \
                 "sensor-light-id": sensor_light_entity_id, "sensor-light-name": sensor_light_entity_name, \
                 "sensor-video-id": sensor_video_entity_id, "sensor-video-name": sensor_video_entity_name, \
                 "sensor-temp-id": sensor_temp_entity_id, "sensor-temp-name": sensor_temp_entity_name, \
                 "sensor-system-id": sensor_system_entity_id, "sensor-system-name": sensor_system_entity_name \
-                }
+                })
+
         try:
             Devices.add(device_id, entity_data=data)
         except ValueError as v:

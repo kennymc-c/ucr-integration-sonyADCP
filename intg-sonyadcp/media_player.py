@@ -15,7 +15,35 @@ _LOG = logging.getLogger(__name__)
 
 
 
-async def mp_cmd_handler(entity: ucapi.MediaPlayer, cmd_id: str, _params: dict[str, Any] | None) -> ucapi.StatusCodes:
+async def add(device_id: str):
+    """Function to add a media player entity with the config.MpDef class definition"""
+
+    mp_name = config.Devices.get(device_id=device_id, key="name")
+    mp_id= device_id
+
+    definition = config.MediaPlayer().get_def(ent_id=mp_id, name=mp_name)
+
+    driver.api.available_entities.add(definition)
+
+    _LOG.info(f"Added projector media player entity with id {mp_id} and name {mp_name} as available entity")
+
+
+
+async def remove(device_id: str):
+    """Function to remove a media player entity with the config.MpDef class definition"""
+
+    mp_name = config.Devices.get(device_id=device_id, key="name")
+    mp_id= device_id
+
+    definition = config.MediaPlayer().get_def(ent_id=mp_id, name=mp_name)
+
+    driver.api.available_entities.add(definition)
+
+    _LOG.info(f"Removed projector media player entity with id {mp_id} and name {mp_name} as available entity")
+
+
+
+async def cmd_handler(entity: ucapi.MediaPlayer, cmd_id: str, _params: dict[str, Any] | None) -> ucapi.StatusCodes:
     """
     Media Player command handler.
 
@@ -48,34 +76,6 @@ async def mp_cmd_handler(entity: ucapi.MediaPlayer, cmd_id: str, _params: dict[s
             _LOG.error(f"Failed to send command {cmd_id}: {error}")
         return ucapi.StatusCodes.BAD_REQUEST
     return ucapi.StatusCodes.OK
-
-
-
-async def add_mp(device_id: str):
-    """Function to add a media player entity with the config.MpDef class definition"""
-
-    mp_name = config.Devices.get(device_id=device_id, key="name")
-    mp_id= device_id
-
-    definition = config.MediaPlayer().get_def(ent_id=mp_id, name=mp_name)
-
-    driver.api.available_entities.add(definition)
-
-    _LOG.info(f"Added projector media player entity with id {mp_id} and name {mp_name} as available entity")
-
-
-
-async def remove_mp(device_id: str):
-    """Function to remove a media player entity with the config.MpDef class definition"""
-
-    mp_name = config.Devices.get(device_id=device_id, key="name")
-    mp_id= device_id
-
-    definition = config.MediaPlayer().get_def(ent_id=mp_id, name=mp_name)
-
-    driver.api.available_entities.add(definition)
-
-    _LOG.info(f"Removed projector media player entity with id {mp_id} and name {mp_name} as available entity")
 
 
 
@@ -196,10 +196,10 @@ async def update_mp(device_id: str):
         else:
             attributes_to_skip.append(attribute)
 
-    if not attributes_to_skip:
+    if attributes_to_skip:
         _LOG.debug(f"Entity attributes for {str(attributes_to_skip)} on {device_id} have not changed since the last update")
 
-    if not attributes_to_update:
+    if attributes_to_update:
         attributes_to_send = {}
         if "state" in attributes_to_update:
             attributes_to_send.update({ucapi.media_player.Attributes.STATE: power})

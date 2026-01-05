@@ -726,18 +726,10 @@ async def complete_setup(device_id:str = None, skip_entities:bool = False) -> uc
             _LOG.error(v)
             return ucapi.SetupError()
 
-        await media_player.add_mp(device_id)
-        await remote.add_remote(device_id)
-        await sensor.add_light_sensor(device_id)
-        await sensor.add_video_sensor(device_id)
-        await sensor.add_system_sensor(device_id)
-
-        try:
-            await projector.get_temp(device_id)
-        except NameError:
-            _LOG.info("Temperature sensor will not be added as available entity")
-        else:
-            await sensor.add_temp_sensor(device_id)
+        await media_player.add(device_id)
+        await remote.add(device_id)
+        for sensor_type in config.Setup.get("sensor_types"):
+            await sensor.add(device_id, sensor_type)
 
     if config.Setup.get("setup_reconfigure") is True:
         #During the initial setup all needed pollers tasks will be started with the subscribe entities event when they get added as configured entities on the remote

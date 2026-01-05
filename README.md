@@ -110,6 +110,27 @@ Please note that when running this integration on the remote the power/mute/inpu
   - Video signal
     - Shows the current resolution, framerate, dynamic range format, color space, color format and 2D/3D status
     - Video signal data is automatically updated when the projector or video muting is turned on or off and when the input is changed
+  - Setting sensors
+    - Each sensor will be updated every time a corresponding command is triggered
+    - All sensors will be updated if the projector is powered on or off and you can also manually update all setting sensors at once with a dedicated simple command
+    - The following sensors are available if the setting is supported by your model:
+      - Power Status
+      - Picture Muting
+      - Picture Preset
+      - Picture Position
+      - Aspect
+      - HDR Status
+      - HDR Dynamic Tone Mapping
+      - Lamp Control
+      - Dynamic Iris Control
+      - Dynamic Light Control
+      - Motionflow
+      - 2D/3D Mode
+      - 3D Format
+      - Input Lag Reduction
+      - Menu Position
+    - If a setting is not supported by the projector model the corresponding sensor is not added as available entity
+    - Sensors for laser dimming and lens control are not included as their current values can't be polled through ADCP
 
 ## Commands & attributes
 
@@ -137,7 +158,7 @@ Please note that when running this integration on the remote the power/mute/inpu
 - Input HDMI 1 & 2
   - Intended for the remote entity in addition to the source select feature of the media player entity
 - Calibration Presets*
-  - Cinema Film 1, Cinema Film 2, Reference, TV, Photo, Game, Bright Cinema, Bright TV, User
+  - Cinema Film 1, Cinema Film 2, Reference, TV, Photo, Game, Bright Cinema, Bright TV, User, User1-3\***
 - Aspect Ratios* ***
   - Normal, Squeeze, Stretch**, V Stretch, Zoom 1:85, Zoom 2:35
 - Picture Positions (Select and Save)***
@@ -145,7 +166,7 @@ Please note that when running this integration on the remote the power/mute/inpu
   - Custom 1-3
   - Custom 4 & 5***
 - HDR* ***
-  - On, Off, Auto
+  - On, Off, Auto, HDR10, HDR Ref, HLG
 - HDR Dynamic Tone Mapping* ***
   - Mode 1, 2, 3, Off
 - Lamp Control* ***

@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - 2026-01-05
+
+### Added
+
+- Added 15 setting sensors for almost all settings
+  - Please power on the projector during setup as most sensor values can't be retrieved when the device is powered off
+    - Otherwise the sensor value will be shown as temporarily unavailable and updated once the projector is powered on
+    - You can also manually update all setting sensors at once with a dedicated simple command
+  - If a setting is not supported by the projector model the corresponding sensor is not added as available entity
+  - Sensors for laser dimming and lens control are not included as their current values can't be polled through ADCP
+- Added missing HDR mode commands for HDR10, HDR Reference and HLG
+- Added missing Picture Preset commands for User 1-3
+- Build workflow: Added an automatic release body generation from the changelog
+- Added debug log messages for websocket connect/disconnect events
+
+### Fixed
+
+- Fixed issue where media player attributes were not updated in some situations ([#3](https://github.com/kennymc-c/ucr-integration-sonyADCP/issues/3))
+
+### Changed
+
+- Updated GitHub actions in build workflow
+- Updated UC Python library to 0.5.1
+
 ## [1.3.1] - 2025-11-10
 
 ### Fixed

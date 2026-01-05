@@ -20,11 +20,24 @@ _LOG = logging.getLogger(__name__)
 class Get (str, Enum):
     """This class is used to define commands that return a query value from the projector"""
 
-    POWER = "power_status ?"
     INPUT = "input ?"
-    MUTE = "blank ?"
     COLOR_SPACE = "color_space ?"
+    #Setting sensors
+    POWER = "power_status ?"
+    MUTE = "blank ?"
+    PICTURE_MODE = "picture_mode ?"
+    PICTURE_POSITION = "pic_pos_sel ?"
+    ASPECT = "aspect ?"
+    MOTIONFLOW = "motionflow ?"
+    HDR = "hdr ?"
+    HDR_DYN_TONE_MAPPING = "hdr_tone_mapping ?"
     MODE_2D_3D = "3d_status ?"
+    MODE_3D_FORMAT = "3d_format ?"
+    DYN_IRIS_CONTROL = "iris_dyn_cont ?"
+    DYN_LIGHT_CONTROL = "light_output_dyn ?"
+    LAMP_CONTROL = "lamp_control ?"
+    INPUT_LAG_REDUCTION = "input_lag_red ?"
+    MENU_POSITION = "menu_pos ?"
     #Query value only commands:
     SIGNAL = "signal ?"
     COLOR_FORMAT = "color_format_info ?" #Not officially documented. Found out by analyzing the adcp.cgi files from the web interface
@@ -36,6 +49,7 @@ class Get (str, Enum):
     MODEL = "modelname ?"
     SERIAL = "serialnum ?"
     MAC = "mac_address ?"
+
 
 class Commands (str, Enum):
     """This class is used to define commands that can be send the projector"""

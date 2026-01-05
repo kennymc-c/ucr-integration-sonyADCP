@@ -273,6 +273,23 @@ async def get_mode_2d_3d(device_id: str):
 
 
 
+async def get_setting(device_id: str, setting: str):
+    """Get the current value of a specific setting from the projector and return it as a string"""
+
+    _LOG.debug(f"Get current value for setting \"{setting}\" for {device_id}")
+
+    adcp_setting_name = config.UC2ADCP.get(setting)
+
+    try:
+        setting_value = await projector_def(device_id).command(adcp_setting_name)
+        setting_value = setting_value.replace('"', "")
+    except Exception as e:
+        raise type(e)(str(e)) from e
+
+    return setting_value
+
+
+
 async def send_cmd(device_id: str, cmd_name:str, params = None):
     """Send a command to the projector and raise an exception if it fails"""
 
@@ -290,6 +307,14 @@ async def send_cmd(device_id: str, cmd_name:str, params = None):
             await sensor.update_light(device_id)
             await sensor.update_temp(device_id)
             await sensor.update_system(device_id)
+        except Exception as e:
+            raise type(e)(str(e))
+
+    elif cmd_name == config.SimpleCommands.UPDATE_SETTING_SENSORS:
+        try:
+            for sensor_type in config.Setup.get("sensor_types"):
+                if sensor_type not in ["light", "video", "temp", "system"]:
+                    await sensor.update_setting(device_id, setting=sensor_type)
         except Exception as e:
             raise type(e)(str(e))
 
@@ -347,7 +372,62 @@ async def send_cmd(device_id: str, cmd_name:str, params = None):
         await update_attributes(device_id, cmd_name)
     except Exception as e:
         #No exception as this is not a critical error. The command itself was sent successfully. Not all query commands are supported by all projector models
-        _LOG.error(f"Failed to update attributes for device {device_id} after command {cmd_name}: {e}")
+        _LOG.error(f"Failed to update entity attributes for device {device_id} after command {cmd_name}: {e}")
+
+    #Update setting sensors
+    match cmd_name:
+
+        case ucapi.media_player.Commands.ON | ucapi.media_player.Commands.OFF | ucapi.media_player.Commands.TOGGLE:
+            setting_name = "power-status"
+            #Update all setting sensors when changing the power status as the projector could have been powered off when the remote subscribed to the sensor entities and some values couldn't be retrieved at that time
+            for sensor_type in config.Setup.get("sensor_types"):
+                if sensor_type not in ["light", "video", "temp", "system"]:
+                    try:
+                        await sensor.update_setting(device_id, sensor_type)
+                    except Exception as e:
+                        error_msg = str(e)
+                        if error_msg:
+                            _LOG.warning(f"Failed to update {sensor_type} sensor value for {device_id}")
+                            _LOG.warning(error_msg)
+                        else:
+                            _LOG.warning(f"Failed to update {sensor_type} sensor value for {device_id}")
+        case ucapi.media_player.Commands.MUTE_TOGGLE | config.SimpleCommands.PICTURE_MUTING_TOGGLE:
+            setting_name = "picture-muting"
+        case _ if cmd_name.startswith("MODE_PIC"):
+            setting_name = "picture-preset"
+        case _ if cmd_name.startswith("MODE_AR"):
+            setting_name = "aspect"
+        case _ if cmd_name.startswith("PIC_POS"):
+            setting_name = "picture-position"
+        case _ if cmd_name.startswith("MODE_HDR") and not cmd_name.startswith("MODE_HDR_TONEMAP"):
+            setting_name = "hdr-status"
+        case _ if cmd_name.startswith("MODE_HDR_TONEMAP"):
+            setting_name = "hdr-dynamic-tone-mapping"
+        case _ if cmd_name.startswith("MODE_LAMP"):
+            setting_name = "lamp_control"
+        case _ if cmd_name.startswith("MODE_DYN_IRIS"):
+            setting_name = "dynamic-iris-control"
+        case _ if cmd_name.startswith("MODE_DYN_LIGHT"):
+            setting_name = "dynamic-light-control"
+        case _ if cmd_name.startswith("MODE_MOTION"):
+            setting_name = "motionflow"
+        case _ if cmd_name.startswith("MODE_2D/3D"):
+            setting_name = "2d/3d-mode"
+        case _ if cmd_name.startswith("MODE_3D"):
+            setting_name = "3d-format"
+        case _ if cmd_name.startswith("MODE_LAG"):
+            setting_name = "input-lag-reduction"
+        case _ if cmd_name.startswith("MENU_POS"):
+            setting_name = "menu-position"
+        case _:
+            _LOG.debug(f"Command {cmd_name} has no associated setting sensor to update")
+            return
+
+    try:
+        await sensor.update_setting(device_id, setting_name)
+    except Exception as e:
+        #No exception as this is not a critical error. The command itself was sent successfully. Not all query commands are supported by all projector models
+        _LOG.error(f"Failed to get setting for device {device_id} after command {cmd_name}: {e}")
 
 
 

@@ -40,10 +40,6 @@ async def startcheck():
             try:
                 mp_entity_id = device_id
                 rt_entity_id = config.Devices.get(device_id=device_id, key="remote-id")
-                sensor_light_entity_id = config.Devices.get(device_id=device_id, key="sensor-light-id")
-                sensor_video_entity_id = config.Devices.get(device_id=device_id, key="sensor-video-id")
-                sensor_temp_entity_id = config.Devices.get(device_id=device_id, key="sensor-temp-id")
-                sensor_system_entity_id = config.Devices.get(device_id=device_id, key="sensor-system-id")
             except ValueError as v:
                 _LOG.error(v)
 
@@ -51,37 +47,19 @@ async def startcheck():
             if api.available_entities.contains(mp_entity_id):
                 _LOG.debug("Projector media player entity with id " + mp_entity_id + " is already in storage as available entity")
             else:
-                await media_player.add_mp(device_id)
+                await media_player.add(device_id)
 
             if api.available_entities.contains(rt_entity_id):
                 _LOG.debug("Projector remote entity with id " + rt_entity_id + " is already in storage as available entity")
             else:
-                await remote.add_remote(device_id)
+                await remote.add(device_id)
 
-            if api.available_entities.contains(sensor_light_entity_id):
-                _LOG.debug("Projector light source timer sensor entity with id " + sensor_light_entity_id + " is already in storage as available entity")
-            else:
-                await sensor.add_light_sensor(device_id)
-
-            if api.available_entities.contains(sensor_video_entity_id):
-                _LOG.debug("Projector video info sensor entity with id " + sensor_video_entity_id + " is already in storage as available entity")
-            else:
-                await sensor.add_video_sensor(device_id)
-
-            if api.available_entities.contains(sensor_temp_entity_id):
-                _LOG.debug("Projector temperature sensor entity with id " + sensor_temp_entity_id + " is already in storage as available entity")
-            else:
-                try:
-                    await projector.get_temp(device_id)
-                except NameError:
-                    _LOG.info("Temperature sensor will not be added as available entity")
+            for sensor_type in config.Setup.get("sensor_types"):
+                sensor_entity_id = config.Devices.get(device_id=device_id, key=f"sensor-{sensor_type}-id")
+                if api.available_entities.contains(sensor_entity_id):
+                    _LOG.debug(f"Projector {sensor_type} sensor entity with id " + sensor_entity_id + " is already in storage as available entity")
                 else:
-                    await sensor.add_temp_sensor(device_id)
-
-            if api.available_entities.contains(sensor_system_entity_id):
-                _LOG.debug("Projector system status sensor entity with id " + sensor_system_entity_id + " is already in storage as available entity")
-            else:
-                await sensor.add_system_sensor(device_id)
+                    await sensor.add(device_id, sensor_type)
     else:
         if len(config.Devices.list()) < 1:
             _LOG.info("Please start the driver setup process")
@@ -91,9 +69,9 @@ async def startcheck():
 
 
 @api.listens_to(ucapi.Events.CONNECT)
-async def on_r2_connect() -> None:
+async def on_intg_connect() -> None:
     """
-    Connect notification from Remote Two.
+    Connect notification from Remote.
 
     Just reply with connected as there is no permanent connection to the projector that needs to be re-established
     """
@@ -104,9 +82,9 @@ async def on_r2_connect() -> None:
 
 
 @api.listens_to(ucapi.Events.DISCONNECT)
-async def on_r2_disconnect() -> None:
+async def on_intg_disconnect() -> None:
     """
-    Disconnect notification from the remote Two.
+    Disconnect notification from Remote.
 
     Just reply with disconnected as there is no permanent connection to the projector that needs to be closed
     """
@@ -116,12 +94,36 @@ async def on_r2_disconnect() -> None:
 
 
 
+@api.listens_to(ucapi.Events.CLIENT_CONNECTED)
+async def on_client_connect() -> None:
+    """
+    Websocket client connect notification from Remote.
+    """
+    _LOG.debug("Remote websocket client connected to this integration websockets server")
+    _LOG.debug("There are currently %d websocket clients connected to this integration websockets server", int(api.client_count))
+
+
+
+@api.listens_to(ucapi.Events.CLIENT_DISCONNECTED)
+async def on_client_disconnect() -> None:
+    """
+    Websocket client disconnect notification from the Remote.
+    """
+    _LOG.debug("Remote websocket client disconnected from this integration websockets server")
+    client_count = int(api.client_count)
+    if client_count > 0:
+        _LOG.debug("There are currently %d websocket clients connected to this integration websockets server", client_count)
+    else:
+        _LOG.debug("No other websocket clients are currently connected to this integration websockets server")
+
+
+
 @api.listens_to(ucapi.Events.ENTER_STANDBY)
 async def on_r2_enter_standby() -> None:
     """
-    Enter standby notification from Remote Two.
+    Enter standby notification from Remote.
 
-    Set config.R2_IN_STANDBY to True and show a debug log message as there is no permanent connection to the projector that needs to be closed.
+    Set standby to True and show a debug log message as there is no permanent connection to the projector that needs to be closed.
     """
     _LOG.info("Received enter standby event message from remote")
 
@@ -132,9 +134,9 @@ async def on_r2_enter_standby() -> None:
 @api.listens_to(ucapi.Events.EXIT_STANDBY)
 async def on_r2_exit_standby() -> None:
     """
-    Exit standby notification from Remote Two.
+    Exit standby notification from Remote.
 
-    Just show a debug log message as there is no permanent connection to the projector that needs to be re-established.
+    Set standby to False show and a debug log message as there is no permanent connection to the projector that needs to be re-established.
     """
     _LOG.info("Received exit standby event message from remote")
 
@@ -179,7 +181,7 @@ async def on_subscribe_entities(entity_ids: list[str]) -> None:
 
                 if rt_id in entity_ids:
                     try:
-                        await remote.update_rt(device_id)
+                        await remote.update(device_id)
                     except OSError as o:
                         _LOG.critical(o)
                     except Exception as e:
@@ -222,6 +224,22 @@ async def on_subscribe_entities(entity_ids: list[str]) -> None:
                 else:
                     _LOG.debug(f"No health sensors for device {device_id} are in the configured entities. Skip starting health poller task")
 
+                for sensor_type in config.Setup.get("sensor_types"):
+                    if sensor_type not in ["light", "video", "temp", "system"]:
+                        sensor_id = config.Devices.get(device_id=device_id, key=f"sensor-{sensor_type}-id")
+                        if sensor_id in entity_ids:
+                            try:
+                                await sensor.update_setting(device_id, sensor_type)
+                            except Exception as e:
+                                error_msg = str(e)
+                                if error_msg:
+                                    _LOG.warning(error_msg)
+                                    _LOG.warning(f"Failed to update {sensor_type} sensor value for {device_id}")
+                                else:
+                                    _LOG.warning(f"Failed to update {sensor_type} sensor value for {device_id}")
+                        else:
+                            _LOG.debug(f"{sensor_id} sensor entity for device {device_id} is not in the configured entities. Skip updating value")
+
 
 
 #BUG No event when removing an entity as configured entity. Could be a UC Python library or core/web configurator bug.
@@ -241,32 +259,26 @@ async def on_unsubscribe_entities(entity_ids: list[str]) -> None:
     for entity_id in entity_ids:
         mp_entity_id= config.Devices.get(device_id=entity_id, key="id")
         rt_entity_id = config.Devices.get(device_id=entity_id, key="remote-id")
-        sensor_light_entity_id = config.Devices.get(device_id=entity_id, key="sensor-light-id")
-        sensor_video_entity_id = config.Devices.get(device_id=entity_id, key="sensor-video-id")
-        sensor_temp_entity_id = config.Devices.get(device_id=entity_id, key="sensor-temp-id")
-        sensor_system_entity_id = config.Devices.get(device_id=entity_id, key="sensor-system-id")
+        device_id = mp_entity_id
 
         if mp_entity_id in entity_ids:
             await media_player.MpPollerController.stop(device_id=entity_id)
-            await media_player.remove_mp(device_id=entity_id)
+            await media_player.remove(device_id=entity_id)
 
         if rt_entity_id in entity_ids:
-            await remote.remove_remote(device_id=entity_id)
+            await remote.remove(device_id=entity_id)
 
-        if sensor_light_entity_id in entity_ids:
-            await sensor.remove_light_sensor(device_id=entity_id)
+        sensors = config.Setup.get("sensor_types")
+        removed_sensor_ids = []
+        for sensor_type in sensors:
+            sensor_id = config.Devices.get(device_id=entity_id, key=f"sensor-{sensor_type}-{device_id}")
+            if sensor_id in entity_ids:
+                removed_sensor_ids.append(sensor_id)
+                await sensor.remove(device_id=entity_id, sensor_type=sensor_type)
 
-        if sensor_video_entity_id in entity_ids:
-            await sensor.remove_video_sensor(device_id=entity_id)
-
-        if sensor_temp_entity_id in entity_ids:
-            await sensor.remove_temp_sensor(device_id=entity_id)
-
-        if sensor_system_entity_id in entity_ids:
-            await sensor.remove_system_sensor(device_id=entity_id)
-
-        if sensor_light_entity_id and sensor_video_entity_id and sensor_temp_entity_id and sensor_system_entity_id in entity_ids:
-            await sensor.HealthPollerController.stop(device_id=entity_id)
+        for removed_sensor_id in removed_sensor_ids:
+            if removed_sensor_id in entity_ids:
+                await sensor.HealthPollerController.stop(device_id=entity_id)
 
 
 

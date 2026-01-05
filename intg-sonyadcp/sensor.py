@@ -13,116 +13,97 @@ import projector
 _LOG = logging.getLogger(__name__)
 
 
-#TODO Combine all sensor add and remove functions into 2 function that take the device_id and sensor type as parameters
-async def add_light_sensor(device_id: str):
-    """Function to add a light source timer sensor entity with the config.LSTSensor class definition and get current light source hours"""
-
-    lt_name = config.Devices.get(device_id=device_id, key="sensor-light-name")
-    lt_id = config.Devices.get(device_id=device_id, key="sensor-light-id")
-
-    definition = config.LSTSensor().get_def(ent_id=lt_id, name=lt_name)
-
-    driver.api.available_entities.add(definition)
-
-    _LOG.info(f"Added projector light source timer sensor entity with id {lt_id} and name {lt_name} as available entity")
+#TODO Add settings sensors (e.g. picture mode, hdr mode, gamma etc.).
+# If a setting gets changed a global update settings sensor function is called. If theres a sensor for that setting it will be updated with the new value.
 
 
 
-async def remove_light_sensor(device_id: str):
-    """Function to remove a light source timer sensor entity with the config.LSTSensor class definition and get current light source hours"""
+async def add(device_id: str, sensor_type: str):
+    """Function to add a sensor entity with the given sensor type. Will check if the sensor type is supported by the projector before adding it.
+    
+    :param device_id: The device ID of the projector
+    :param sensor_type: The type of the sensor to add. Possible values are config.Setup["sensor_types"]
+    """
 
-    lt_name = config.Devices.get(device_id=device_id, key="sensor-light-name")
-    lt_id = config.Devices.get(device_id=device_id, key="sensor-light-id")
+    sensor_name = config.Devices.get(device_id=device_id, key="sensor-"+sensor_type+"-name")
+    sensor_id = config.Devices.get(device_id=device_id, key="sensor-"+sensor_type+"-id")
+    sensor_device_class = None
+    sensor_attributes = {ucapi.sensor.Attributes.STATE: ucapi.sensor.States.ON}
+    sensor_options = {}
 
-    definition = config.LSTSensor().get_def(ent_id=lt_id, name=lt_name)
+    if sensor_type not in config.Setup.get("sensor_types"):
+        _LOG.error(f"Sensor type {sensor_type} is not valid. Cannot add sensor entity for {device_id}. Valid types are {str(config.Setup.get('sensor_types'))}")
+        return
 
-    driver.api.available_entities.add(definition)
+    if sensor_type == "light":
+        sensor_device_class = ucapi.sensor.DeviceClasses.CUSTOM
+        sensor_attributes.update({ucapi.sensor.Attributes.UNIT: "h"})
+        sensor_options = {ucapi.sensor.Options.CUSTOM_UNIT: "h"}
 
-    _LOG.info(f"Removed projector light source timer sensor entity with id {lt_id} and name {lt_name} as available entity")
+    elif sensor_type == "temp":
+        _LOG.debug(f"Checking if temperature sensor is supported for {device_id}")
+        try:
+            await projector.get_temp(device_id)
+        except NameError:
+            _LOG.info("Temperature sensor will not be added as available entity as it's not supported by the projector model")
+            return
+        sensor_device_class = ucapi.sensor.DeviceClasses.TEMPERATURE
 
+    elif sensor_type in ("video", "system"):
+        sensor_device_class = ucapi.sensor.DeviceClasses.CUSTOM
 
+    elif sensor_type in ("picture-muting", "input-lag-reduction"):
+        sensor_device_class = ucapi.sensor.DeviceClasses.BINARY
+        sensor_attributes.update({ucapi.sensor.Attributes.UNIT: sensor_type.replace("-"," ").title()})
 
-async def add_video_sensor(device_id: str):
-    """Function to add a video info sensor entity with the config.VISensor class definition and get current video signal info"""
+    else:
+        sensor_device_class = ucapi.sensor.DeviceClasses.CUSTOM
+        _LOG.debug(f"Checking if {sensor_type} is a valid setting for {device_id}")
+        try:
+            await projector.get_setting(device_id, setting=sensor_type)
+        except NameError:
+            _LOG.info(f"Setting {sensor_type} is not supported for this model. The sensor will not be added as available entity")
+            return
+        except OSError:
+            _LOG.info(f"Could not get a value for {sensor_type}. Probably because the projector is powered off. The sensor will be updated when the projector is powered on")
+        except Exception as e:
+            error_msg = str(e)
+            if error_msg:
+                _LOG.debug(e)
+            _LOG.error(f"Error while checking if setting {sensor_type} is valid for {device_id}. Trying later when the projector is powered on")
 
-    vi_name = config.Devices.get(device_id=device_id, key="sensor-video-name")
-    vi_id = config.Devices.get(device_id=device_id, key="sensor-video-id")
-
-    definition = config.VISensor().get_def(ent_id=vi_id, name=vi_name)
-
-    driver.api.available_entities.add(definition)
-
-    _LOG.info(f"Added projector video info sensor entity with id {vi_id} and name {vi_name} as available entity")
-
-
-
-async def remove_video_sensor(device_id: str):
-    """Function to remove a video info sensor entity with the config.VISensor class definition and get current video signal info"""
-
-    vi_name = config.Devices.get(device_id=device_id, key="sensor-video-name")
-    vi_id = config.Devices.get(device_id=device_id, key="sensor-video-id")
-
-    definition = config.VISensor().get_def(ent_id=vi_id, name=vi_name)
-
-    driver.api.available_entities.add(definition)
-
-    _LOG.info(f"Removed projector video info sensor entity with id {vi_id} and name {vi_name} as available entity")
-
-
-
-async def add_temp_sensor(device_id: str):
-    """Function to add a temperature sensor entity with the config.TEMPSensor class definition and get current projector temperature"""
-
-    temp_name = config.Devices.get(device_id=device_id, key="sensor-temp-name")
-    temp_id = config.Devices.get(device_id=device_id, key="sensor-temp-id")
-
-    definition = config.TEMPSensor().get_def(ent_id=temp_id, name=temp_name)
-
-    driver.api.available_entities.add(definition)
-
-    _LOG.info(f"Added projector temperature sensor entity with id {temp_id} and name {temp_name} as available entity")
-
-
-
-async def remove_temp_sensor(device_id: str):
-    """Function to remove a temperature sensor entity with the config.TEMPSensor class definition and get current projector temperature"""
-
-    temp_name = config.Devices.get(device_id=device_id, key="sensor-temp-name")
-    temp_id = config.Devices.get(device_id=device_id, key="sensor-temp-id")
-
-    definition = config.TEMPSensor().get_def(ent_id=temp_id, name=temp_name)
+    definition = ucapi.Sensor(
+        sensor_id,
+        sensor_name,
+        features=None, #Mandatory although sensor entities have no features
+        attributes=sensor_attributes,
+        device_class=sensor_device_class,
+        options=sensor_options,
+    )
 
     driver.api.available_entities.add(definition)
 
-    _LOG.info(f"Removed projector temperature sensor entity with id {temp_id} and name {temp_name} as available entity")
+    _LOG.info(f"Added projector sensor entity with id {sensor_id} and name {sensor_name} as available entity")
 
 
 
-async def add_system_sensor(device_id: str):
-    """Function to add a system status sensor entity with the config.SYSTEMSensor class definition and get current error and warning messages"""
+async def remove(device_id: str, sensor_type: str):
+    """Function to remove a sensor entity with the config sensor class definition
+    
+    :param device_id: The device ID of the projector
+    :param sensor_type: The type of the sensor to remove. Possible values are config.Setup["sensor_types"]
+    """
 
-    system_name = config.Devices.get(device_id=device_id, key="sensor-system-name")
-    system_id = config.Devices.get(device_id=device_id, key="sensor-system-id")
+    if sensor_type not in config.Setup.get("sensor_types"):
+        _LOG.error(f"Sensor type {sensor_type} is not valid. Cannot remove sensor entity for device_id {device_id}. Valid types are {str(config.Setup.get('sensor_types'))}")
+        return
 
-    definition = config.SYSTEMSensor().get_def(ent_id=system_id, name=system_name)
+    sensor_id = config.Devices.get(device_id=device_id, key="sensor-"+sensor_type+"-id")
+    sensor_name = config.Devices.get(device_id=device_id, key="sensor-"+sensor_type+"-name")
 
-    driver.api.available_entities.add(definition)
+    driver.api.available_entities.remove(sensor_id)
 
-    _LOG.info(f"Added projector system status sensor entity with id {system_id} and name {system_name} as available entity")
-
-
-
-async def remove_system_sensor(device_id: str):
-    """Function to remove a system status sensor entity with the config.SYSTEMSensor class definition and get current error and warning messages"""
-
-    system_name = config.Devices.get(device_id=device_id, key="sensor-system-name")
-    system_id = config.Devices.get(device_id=device_id, key="sensor-system-id")
-
-    definition = config.SYSTEMSensor().get_def(ent_id=system_id, name=system_name)
-
-    driver.api.available_entities.add(definition)
-
-    _LOG.info(f"Removed projector system status sensor entity with id {system_id} and name {system_name} as available entity")
+    _LOG.info(f"Removed projector sensor entity with id {sensor_id} and name {sensor_name} as available entity")
 
 
 
@@ -464,3 +445,57 @@ async def update_video(device_id: str):
         raise Exception("Error while updating sensor value for entity id " + sensor_video_id ) from e
 
     _LOG.info(f"Updated video signal infos for {device_id} sensor value to " + str(video_info))
+
+
+
+async def update_setting(device_id: str, setting: str):
+    """Function to update a setting sensor entity for the given setting
+    
+    :param device_id: The device ID of the projector
+    :param setting: The name of the setting that triggered the update
+    """
+
+    _LOG.info(f"Updating {setting} sensor for {device_id}")
+
+    try:
+        current_value = await projector.get_setting(device_id, setting)
+    except OSError:
+        _LOG.info(f"Retrieving {setting} from {device_id} temporarily unavailable. Setting state and value to Unknown")
+        current_value = "Temporarily unavailable"
+    except Exception as e:
+        _LOG.warning(f"Failed to get {setting} value from {device_id}. Setting value to Error and state to Unavailable")
+        _LOG.debug(e)
+        current_value = "Error"
+
+    state = ucapi.sensor.States.UNAVAILABLE
+    if current_value in ("Error", "Temporarily unavailable"):
+        state = ucapi.sensor.States.UNKNOWN
+    else:
+        state = ucapi.sensor.States.ON
+
+    if current_value == "1.85_1":
+        current_value = "1.85:1"
+    elif current_value == "2.35_1":
+        current_value = "2.35:1"
+    elif current_value == "sim3d":
+        current_value = "Simulated 3D"
+    elif current_value == "sidebyside":
+        current_value = "Side by Side"
+    elif current_value == "overunder":
+        current_value = "Over Under"
+    else:
+        current_value = current_value.replace("_", " ").replace("brt", "bright").title()
+        # If the value ends with a single digit (e.g. "Mode1"), separate it with a space -> "Mode 1"
+        if len(current_value) >= 2 and current_value[-1].isdigit() and not current_value[-2].isdigit():
+            current_value = current_value[:-1] + " " + current_value[-1]
+
+    attributes_to_send = {ucapi.sensor.Attributes.STATE: state, ucapi.sensor.Attributes.VALUE: current_value}
+
+    sensor_id = config.Devices.get(device_id=device_id, key="sensor-"+setting+"-id")
+    try:
+        driver.api.configured_entities.update_attributes(sensor_id, attributes_to_send)
+    except Exception as e:
+        _LOG.error(e)
+        raise Exception("Error while updating sensor value for entity id " + sensor_id) from e
+
+    _LOG.info(f"Updated {setting} value for {device_id} sensor value to " + str(current_value))
