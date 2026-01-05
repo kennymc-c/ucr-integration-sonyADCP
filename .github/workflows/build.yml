@@ -29,11 +29,15 @@ jobs:
         #Id needed for env output variable
         id: get-version-and-id
         run: |
-          echo "VERSION=$(jq .version -r driver.json)" >> $GITHUB_ENV
-          echo "DRIVER_ID=$(jq .driver_id -r driver.json)" >> $GITHUB_ENV
-          # Save to Github output to later use it in Create Release job
-          echo "VERSION=$(jq .version -r driver.json)" >> $GITHUB_OUTPUT
-          echo "DRIVER_ID=$(jq .driver_id -r driver.json)" >> $GITHUB_OUTPUT
+          # Read values into variables (use -r to avoid quotes/newlines)
+          VERSION=$(jq -r .version driver.json)
+          DRIVER_ID=$(jq -r .driver_id driver.json)
+          # Export to environment for following steps
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "DRIVER_ID=$DRIVER_ID" >> $GITHUB_ENV
+          # Also expose as step outputs for job outputs
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          echo "DRIVER_ID=$DRIVER_ID" >> $GITHUB_OUTPUT
 
       - name: Build
         run: |
