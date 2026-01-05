@@ -84,6 +84,9 @@ jobs:
       - name: Download build artifacts
         uses: actions/download-artifact@v7
 
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
       - name: Extract build archives from downloaded files
         run: |
           ls -R
