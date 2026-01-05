@@ -17,7 +17,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Sensors for laser dimming and lens control are not included as their current values can't be polled through ADCP
 - Added missing HDR mode commands for HDR10, HDR Reference and HLG
 - Added missing Picture Preset commands for User 1-3
-- Build workflow: Added an automatic release body generation from the changelog
 - Added debug log messages for websocket connect/disconnect events
 
 ### Fixed

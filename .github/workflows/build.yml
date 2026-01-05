@@ -29,15 +29,12 @@ jobs:
         #Id needed for env output variable
         id: get-version-and-id
         run: |
-          # Read values into variables (use -r to avoid quotes/newlines)
-          VERSION=$(jq -r .version driver.json)
-          DRIVER_ID=$(jq -r .driver_id driver.json)
-          # Export to environment for following steps
-          echo "VERSION=$VERSION" >> $GITHUB_ENV
-          echo "DRIVER_ID=$DRIVER_ID" >> $GITHUB_ENV
-          # Also expose as step outputs for job outputs
-          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
-          echo "DRIVER_ID=$DRIVER_ID" >> $GITHUB_OUTPUT
+          echo "VERSION=$(jq .version -r driver.json)" >> $GITHUB_ENV
+          echo "DRIVER_ID=$(jq .driver_id -r driver.json)" >> $GITHUB_ENV
+          # Save to Github output to later use it in Create Release job
+          echo "VERSION=$(jq .version -r driver.json)" >> $GITHUB_OUTPUT
+          echo "DRIVER_ID=$(jq .driver_id -r driver.json)" >> $GITHUB_OUTPUT
+
 
       - name: Build
         run: |
@@ -106,26 +103,10 @@ jobs:
         run: |
           for filename in *.tar.gz; do echo "sha256  `sha256sum $filename`" >> ${{needs.build.outputs.driver_id}}.hash; done;
 
-      - name: Extract changelog entry
-        id: extract_changelog
-        run: |
-          VER=${{needs.build.outputs.version}}
-          # Find the changelog section for the version and write to a temp file
-          awk -v ver="## [${VER}]" '
-            $0==ver {found=1; next}
-            /^## \[/ && found {exit}
-            found {print}
-          ' CHANGELOG.md > changelog.tmp || true
-          # Export multiline env var for use in create release draft step
-          echo "CHANGELOG_BODY<<'EOF'" >> $GITHUB_ENV
-          cat changelog.tmp >> $GITHUB_ENV
-          echo "EOF" >> $GITHUB_ENV
-
       - name: Create release draft
         uses: ncipollo/release-action@v1
         with:
           artifacts: "*.tar.gz,${{needs.build.outputs.driver_id}}.hash"
-          body: ${{ env.CHANGELOG_BODY }}
           draft: true
           generateReleaseNotes: true
           artifactErrorsFailBuild: true
