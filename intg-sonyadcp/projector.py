@@ -377,20 +377,14 @@ async def send_cmd(device_id: str, cmd_name:str, params = None):
     #Update setting sensors
     match cmd_name:
 
+        case ucapi.remote.Commands.SEND_CMD | ucapi.remote.Commands.SEND_CMD_SEQUENCE:
+            #Update all setting sensors as we don't know which command was sent
+            await update_all_sensors(device_id)
         case ucapi.media_player.Commands.ON | ucapi.media_player.Commands.OFF | ucapi.media_player.Commands.TOGGLE:
             setting_name = "power-status"
-            #Update all setting sensors when changing the power status as the projector could have been powered off when the remote subscribed to the sensor entities and some values couldn't be retrieved at that time
-            for sensor_type in config.Setup.get("sensor_types"):
-                if sensor_type not in ["light", "video", "temp", "system"]:
-                    try:
-                        await sensor.update_setting(device_id, sensor_type)
-                    except Exception as e:
-                        error_msg = str(e)
-                        if error_msg:
-                            _LOG.warning(f"Failed to update {sensor_type} sensor value for {device_id}")
-                            _LOG.warning(error_msg)
-                        else:
-                            _LOG.warning(f"Failed to update {sensor_type} sensor value for {device_id}")
+            #Update all setting sensors when changing the power status as the projector could have been powered off when the remote subscribed to the sensor entities \
+            #and some values couldn't be retrieved at that time
+            await update_all_sensors(device_id)
         case ucapi.media_player.Commands.MUTE_TOGGLE | config.SimpleCommands.PICTURE_MUTING_TOGGLE:
             setting_name = "picture-muting"
         case _ if cmd_name.startswith("MODE_PIC"):
@@ -428,6 +422,21 @@ async def send_cmd(device_id: str, cmd_name:str, params = None):
     except Exception as e:
         #No exception as this is not a critical error. The command itself was sent successfully. Not all query commands are supported by all projector models
         _LOG.error(f"Failed to get setting for device {device_id} after command {cmd_name}: {e}")
+
+
+async def update_all_sensors(device_id:str):
+    """Update all sensor entity values for a specific device"""
+    for sensor_type in config.Setup.get("sensor_types"):
+        if sensor_type not in ["light", "video", "temp", "system"]:
+            try:
+                await sensor.update_setting(device_id, sensor_type)
+            except Exception as e:
+                error_msg = str(e)
+                if error_msg:
+                    _LOG.warning(f"Failed to update {sensor_type} sensor value for {device_id}")
+                    _LOG.warning(error_msg)
+                else:
+                    _LOG.warning(f"Failed to update {sensor_type} sensor value for {device_id}")
 
 
 

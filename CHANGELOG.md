@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.1] - 2026-01-24
+
+### Fixed
+
+- Fixed an issue where some sensors are shown as unavailable a restart of the integration/remote
+
+### Changed
+
+- Improved log level filters when running under systemd like on the remote
+
+### Added
+
+- Added sensors for gamma, color space and color temperature
+  - These sensors will be updated either with the global `UPDATE_SETTING_SENS` simple command or if a send command/send command sequence command has been received which allows you to send raw ADCP commands like changing these settings. There are no deticated simple commands to change gamma, color space and temperature
+
 ## [1.4.0] - 2026-01-05
 
 ### Added

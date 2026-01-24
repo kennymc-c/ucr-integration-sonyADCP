@@ -13,10 +13,6 @@ import projector
 _LOG = logging.getLogger(__name__)
 
 
-#TODO Add settings sensors (e.g. picture mode, hdr mode, gamma etc.).
-# If a setting gets changed a global update settings sensor function is called. If theres a sensor for that setting it will be updated with the new value.
-
-
 
 async def add(device_id: str, sensor_type: str):
     """Function to add a sensor entity with the given sensor type. Will check if the sensor type is supported by the projector before adding it.
@@ -25,65 +21,81 @@ async def add(device_id: str, sensor_type: str):
     :param sensor_type: The type of the sensor to add. Possible values are config.Setup["sensor_types"]
     """
 
-    sensor_name = config.Devices.get(device_id=device_id, key="sensor-"+sensor_type+"-name")
-    sensor_id = config.Devices.get(device_id=device_id, key="sensor-"+sensor_type+"-id")
-    sensor_device_class = None
-    sensor_attributes = {ucapi.sensor.Attributes.STATE: ucapi.sensor.States.ON}
-    sensor_options = {}
+    try:
+        sensor_name = config.Devices.get(device_id=device_id, key="sensor-"+sensor_type+"-name")
+        sensor_id = config.Devices.get(device_id=device_id, key="sensor-"+sensor_type+"-id")
+        sensor_device_class = None
+        sensor_attributes = {ucapi.sensor.Attributes.STATE: ucapi.sensor.States.ON}
+        sensor_options = {}
 
-    if sensor_type not in config.Setup.get("sensor_types"):
-        _LOG.error(f"Sensor type {sensor_type} is not valid. Cannot add sensor entity for {device_id}. Valid types are {str(config.Setup.get('sensor_types'))}")
-        return
-
-    if sensor_type == "light":
-        sensor_device_class = ucapi.sensor.DeviceClasses.CUSTOM
-        sensor_attributes.update({ucapi.sensor.Attributes.UNIT: "h"})
-        sensor_options = {ucapi.sensor.Options.CUSTOM_UNIT: "h"}
-
-    elif sensor_type == "temp":
-        _LOG.debug(f"Checking if temperature sensor is supported for {device_id}")
-        try:
-            await projector.get_temp(device_id)
-        except NameError:
-            _LOG.info("Temperature sensor will not be added as available entity as it's not supported by the projector model")
+        if sensor_type not in config.Setup.get("sensor_types"):
+            _LOG.error(f"Sensor type {sensor_type} is not valid. Cannot add sensor entity for {device_id}. Valid types are {str(config.Setup.get('sensor_types'))}")
             return
-        sensor_device_class = ucapi.sensor.DeviceClasses.TEMPERATURE
 
-    elif sensor_type in ("video", "system"):
-        sensor_device_class = ucapi.sensor.DeviceClasses.CUSTOM
+        if sensor_type == "light":
+            sensor_device_class = ucapi.sensor.DeviceClasses.CUSTOM
+            sensor_attributes.update({ucapi.sensor.Attributes.UNIT: "h"})
+            sensor_options = {ucapi.sensor.Options.CUSTOM_UNIT: "h"}
 
-    elif sensor_type in ("picture-muting", "input-lag-reduction"):
-        sensor_device_class = ucapi.sensor.DeviceClasses.BINARY
-        sensor_attributes.update({ucapi.sensor.Attributes.UNIT: sensor_type.replace("-"," ").title()})
+        elif sensor_type == "temp":
+            _LOG.debug(f"Checking if temperature sensor is supported for {device_id}")
+            try:
+                await projector.get_temp(device_id)
+            except NameError:
+                _LOG.info("Temperature sensor will not be added as available entity as it's not supported by the projector model")
+                return
+            except OSError:
+                _LOG.info(f"Could not get temperature value for {device_id}. Probably because the projector is powered off. \
+                        The sensor will be updated when the projector is powered on")
+            except Exception as e:
+                error_msg = str(e)
+                if error_msg:
+                    _LOG.debug(e)
+                _LOG.warning(f"Error while checking if temperature sensor is valid for {device_id}. Adding sensor anyway - it will be updated when projector is reachable")
+            sensor_device_class = ucapi.sensor.DeviceClasses.TEMPERATURE
 
-    else:
-        sensor_device_class = ucapi.sensor.DeviceClasses.CUSTOM
-        _LOG.debug(f"Checking if {sensor_type} is a valid setting for {device_id}")
-        try:
-            await projector.get_setting(device_id, setting=sensor_type)
-        except NameError:
-            _LOG.info(f"Setting {sensor_type} is not supported for this model. The sensor will not be added as available entity")
-            return
-        except OSError:
-            _LOG.info(f"Could not get a value for {sensor_type}. Probably because the projector is powered off. The sensor will be updated when the projector is powered on")
-        except Exception as e:
-            error_msg = str(e)
-            if error_msg:
-                _LOG.debug(e)
-            _LOG.error(f"Error while checking if setting {sensor_type} is valid for {device_id}. Trying later when the projector is powered on")
+        elif sensor_type in ("video", "system"):
+            sensor_device_class = ucapi.sensor.DeviceClasses.CUSTOM
 
-    definition = ucapi.Sensor(
-        sensor_id,
-        sensor_name,
-        features=None, #Mandatory although sensor entities have no features
-        attributes=sensor_attributes,
-        device_class=sensor_device_class,
-        options=sensor_options,
-    )
+        elif sensor_type in ("picture-muting", "input-lag-reduction"):
+            sensor_device_class = ucapi.sensor.DeviceClasses.BINARY
+            sensor_attributes.update({ucapi.sensor.Attributes.UNIT: sensor_type.replace("-"," ").title()})
 
-    driver.api.available_entities.add(definition)
+        else:
+            sensor_device_class = ucapi.sensor.DeviceClasses.CUSTOM
+            _LOG.debug(f"Checking if {sensor_type} is a valid setting for {device_id}")
+            try:
+                await projector.get_setting(device_id, setting=sensor_type)
+            except NameError:
+                _LOG.info(f"Setting {sensor_type} is not supported for this model. The sensor will not be added as available entity")
+                return
+            except OSError:
+                _LOG.info(f"Could not get a value for {sensor_type}. Probably because the projector is powered off. \
+                          The sensor will be updated when the projector is powered on")
+            except Exception as e:
+                error_msg = str(e)
+                if error_msg:
+                    _LOG.debug(e)
+                _LOG.warning(f"Error while checking if setting {sensor_type} is valid for {device_id}. Adding sensor anyway - it will be updated when projector is reachable")
 
-    _LOG.info(f"Added projector sensor entity with id {sensor_id} and name {sensor_name} as available entity")
+        definition = ucapi.Sensor(
+            sensor_id,
+            sensor_name,
+            features=None, #Mandatory although sensor entities have no features
+            attributes=sensor_attributes,
+            device_class=sensor_device_class,
+            options=sensor_options,
+        )
+
+        driver.api.available_entities.add(definition)
+
+        _LOG.info(f"Added projector sensor entity with id {sensor_id} and name {sensor_name} as available entity")
+
+    except Exception as e:
+        error_msg = str(e)
+        if error_msg:
+            _LOG.error(f"Exception details: {e}")
+        _LOG.error(f"Error while adding sensor entity {sensor_type} for device {device_id}. Sensor will not be available until integration is restarted")
 
 
 
@@ -483,7 +495,15 @@ async def update_setting(device_id: str, setting: str):
         current_value = "Side by Side"
     elif current_value == "overunder":
         current_value = "Over Under"
-    else:
+    elif current_value == "bt709":
+        current_value = "BT.709"
+    elif current_value == "bt2020":
+        current_value = "BT.2020"
+    elif current_value == "adobe_rgb":
+        current_value = "Adobe RGB"
+    elif current_value == "dci":
+        current_value = "DCI"
+    elif current_value not in ("1.8", "2.0", "2.1", "2.2", "2.4", "2.6"):
         current_value = current_value.replace("_", " ").replace("brt", "bright").title()
         # If the value ends with a single digit (e.g. "Mode1"), separate it with a space -> "Mode 1"
         if len(current_value) >= 2 and current_value[-1].isdigit() and not current_value[-2].isdigit():

@@ -112,7 +112,8 @@ Please note that when running this integration on the remote the power/mute/inpu
     - Video signal data is automatically updated when the projector or video muting is turned on or off and when the input is changed
   - Setting sensors
     - Each sensor will be updated every time a corresponding command is triggered
-    - All sensors will be updated if the projector is powered on or off and you can also manually update all setting sensors at once with a dedicated simple command
+    - All sensors will be updated if the projector is powered on or off or if a send command/send command sequence command from the remote entity has been received
+      - You can also manually update all setting sensors at once with a dedicated simple command
     - The following sensors are available if the setting is supported by your model:
       - Power Status
       - Picture Muting
@@ -129,6 +130,9 @@ Please note that when running this integration on the remote the power/mute/inpu
       - 3D Format
       - Input Lag Reduction
       - Menu Position
+      - Color Temperature
+      - Color Space
+      - Gamma
     - If a setting is not supported by the projector model the corresponding sensor is not added as available entity
     - Sensors for laser dimming and lens control are not included as their current values can't be polled through ADCP
 

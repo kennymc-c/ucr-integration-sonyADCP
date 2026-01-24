@@ -219,7 +219,7 @@ async def update_mp(device_id: str):
         _LOG.debug(f"No projector attributes for {device_id} to update. Skipping update process")
 
 
-
+#TODO Remove when 2.7.2 firmware or newer with sensor widgets is also available for R2
 async def update_video(device_id: str):
     """Update video info data in media playback attributes"""
 

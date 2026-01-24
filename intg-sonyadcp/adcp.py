@@ -21,7 +21,6 @@ class Get (str, Enum):
     """This class is used to define commands that return a query value from the projector"""
 
     INPUT = "input ?"
-    COLOR_SPACE = "color_space ?"
     #Setting sensors
     POWER = "power_status ?"
     MUTE = "blank ?"
@@ -38,6 +37,9 @@ class Get (str, Enum):
     LAMP_CONTROL = "lamp_control ?"
     INPUT_LAG_REDUCTION = "input_lag_red ?"
     MENU_POSITION = "menu_pos ?"
+    COLOR_SPACE = "color_space ?"
+    COLOR_TEMPERATURE = "color_temp ?"
+    GAMMA = "gamma_correction ?"
     #Query value only commands:
     SIGNAL = "signal ?"
     COLOR_FORMAT = "color_format_info ?" #Not officially documented. Found out by analyzing the adcp.cgi files from the web interface
@@ -216,16 +218,22 @@ class Values():
         BOTTOM_LEFT = "\"bottom_left\""
         CENTER = "\"center\""
 
+    #Not yet uses as simple commands
     class ColorSpaces (str, Enum):
         """This class is used to define the color spaces that can be used with the color_space  command"""
 
         BT709 = "\"bt709\""
         BT2020 = "\"bt2020\""
+        ADOBE_RGB = "\"adobe_rgb\""
         COLOR_SPACE1 = "\"color_space1\""
         COLOR_SPACE2 = "\"color_space2\""
         COLOR_SPACE3 = "\"color_space3\""
         CUSTOM = "\"custom\""
+        CUSTOM1 = "\"custom1\""
+        CUSTOM2 = "\"custom2\""
+        DCI = "\"dci\""
 
+    #Not yet uses as simple commands
     class ColorTemps (str, Enum):
         """This class is used to define the color temps that can be used with the color_temp command"""
         CUSTOM1 = "\"custom1\""
@@ -237,6 +245,22 @@ class Values():
         D75 = "\"d75\""
         D65 = "\"d65\""
         D55 = "\"d55\""
+        DCI = "\"dci\""
+
+    #Not yet uses as simple commands
+    class GammaValues (str, Enum):
+        """This class is used to define the gamma values that can be used with the gamma_correction command"""
+        GAMMA_1_8 = "\"1.8\""
+        GAMMA_2_0 = "\"2.0\""
+        GAMMA_2_1 = "\"2.1\""
+        GAMMA_2_2 = "\"2.2\""
+        GAMMA_2_4 = "\"2.4\""
+        GAMMA_2_6 = "\"2.6\""
+        GAMMA_7 = "\"gamma7\""
+        GAMMA_8 = "\"gamma8\""
+        GAMMA_9 = "\"gamma9\""
+        GAMMA_10 = "\"gamma10\""
+        OFF = "\"off\""
 
 class Responses():
     """Includes all classes with responses that can be returned by response only get commands"""

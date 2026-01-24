@@ -229,6 +229,9 @@ class UC2ADCP:
         "3d-format" : f"{ADCP.Get.MODE_3D_FORMAT.value}",
         "input-lag-reduction" : f"{ADCP.Get.INPUT_LAG_REDUCTION.value}",
         "menu-position" : f"{ADCP.Get.MENU_POSITION.value}",
+        "color-temperature" : f"{ADCP.Get.COLOR_TEMPERATURE.value}",
+        "color-space" : f"{ADCP.Get.COLOR_SPACE.value}",
+        "gamma" : f"{ADCP.Get.GAMMA.value}",
     }
 
     @staticmethod
@@ -266,6 +269,7 @@ class MediaPlayer():
         ucapi.media_player.Attributes.MUTED: False,
         ucapi.media_player.Attributes.SOURCE: "",
         ucapi.media_player.Attributes.SOURCE_LIST: [cmd.value for cmd in Sources],
+        #TODO Remove when 2.7.2 firmware or newer with sensor widgets is also available for R2
         ucapi.media_player.Attributes.MEDIA_IMAGE_URL: "https://img.icons8.com/ios-glyphs/420/FFFFFF/refresh--v1.png"
         #BUG Using a data url instead of a web url for media image url results in a ui error: https://github.com/unfoldedcircle/feature-and-bug-tracker/issues/529
         #TODO #WAIT Replace media image web url with data url when bug is solved
@@ -385,7 +389,8 @@ class Setup:
             {"light", "video", "temp", "system", \
             #Setting sensors
             "power-status", "picture-muting", "picture-preset", "aspect", "picture-position", "hdr-status", "hdr-dynamic-tone-mapping", "lamp-control",\
-            "dynamic-iris-control", "dynamic-light-control", "motionflow", "2d/3d-mode", "3d-format", "input-lag-reduction", "menu-position",
+            "dynamic-iris-control", "dynamic-light-control", "motionflow", "2d/3d-mode", "3d-format", "input-lag-reduction", "menu-position",\
+            "color-temperature", "color-space", "gamma"
             },
     }
     __setters = ["setup_complete", "setup_reconfigure", "setup_step", "setup_auto_discovery", "setup_reconfigure_device", \

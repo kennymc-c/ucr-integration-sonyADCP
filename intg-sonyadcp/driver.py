@@ -14,7 +14,6 @@ import setup
 import media_player
 import sensor
 import remote
-import projector
 
 _LOG = logging.getLogger("driver")  # avoid having __main__ in log messages
 
@@ -42,6 +41,7 @@ async def startcheck():
                 rt_entity_id = config.Devices.get(device_id=device_id, key="remote-id")
             except ValueError as v:
                 _LOG.error(v)
+                continue
 
             #Add all entities as available entities
             if api.available_entities.contains(mp_entity_id):
@@ -55,7 +55,12 @@ async def startcheck():
                 await remote.add(device_id)
 
             for sensor_type in config.Setup.get("sensor_types"):
-                sensor_entity_id = config.Devices.get(device_id=device_id, key=f"sensor-{sensor_type}-id")
+                try:
+                    sensor_entity_id = config.Devices.get(device_id=device_id, key=f"sensor-{sensor_type}-id")
+                except ValueError as v:
+                    _LOG.error(f"Error while getting sensor ID for {sensor_type}: {v}")
+                    continue
+
                 if api.available_entities.contains(sensor_entity_id):
                     _LOG.debug(f"Projector {sensor_type} sensor entity with id " + sensor_entity_id + " is already in storage as available entity")
                 else:
@@ -301,14 +306,45 @@ def setup_logger():
 
 
 
+class JournaldFormatter(logging.Formatter):
+    """Formatter for journald. Prefixes messages with priority level."""
+
+    def format(self, record):
+        """Format the log record with journald priority prefix."""
+        # mapping of logging levels to journald priority levels
+        # https://www.freedesktop.org/software/systemd/man/latest/sd-daemon.html#syslog-compatible-log-levels
+        # Note: DEBUG app messages are logged with priority 6 (info) and INFO with priority 5 (notice)
+        # This is a workaround until the log subsystem on the Remote is updated to support debug levels.
+        priority = {
+            logging.DEBUG: "<6>", # SD_INFO
+            logging.INFO: "<5>", # SD_NOTICE
+            logging.WARNING: "<4>",
+            logging.ERROR: "<3>",
+            logging.CRITICAL: "<2>",
+        }.get(record.levelno, "<6>")
+        return f"{priority}{record.name:<14s} | {record.getMessage()}"
+
+
+
 async def main():
     """Main function that gets logging from all sub modules and starts the driver"""
 
+    if os.getenv("INVOCATION_ID"):
+        # when running under systemd: timestamps are added by the journal
+        # and we use a custom formatter for journald priority levels
+        handler = logging.StreamHandler()
+        handler.setFormatter(JournaldFormatter())
+        logging.basicConfig(handlers=[handler])
+    else:
+        logging.basicConfig(
+            format="%(asctime)s.%(msecs)03d | %(levelname)-8s | %(name)-14s | %(message)s",
+            datefmt="%Y-%m-%d %H:%M:%S",
+        )
+
+    setup_logger()
+
     #Check if integration runs in a PyInstaller bundle on the remote and adjust the logging format, config file path and disable power/mute/input poller task
     if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
-
-        logging.basicConfig(format="%(name)-14s %(levelname)-8s %(message)s")
-        setup_logger()
 
         _LOG.info("This integration is running in a PyInstaller bundle. Probably on the remote hardware")
         config.Setup.set("bundle_mode", True)
@@ -320,9 +356,6 @@ async def main():
         _LOG.info("Deactivating power/mute/input poller to reduce battery consumption when running on the remote")
         _LOG.info("The poller task may still be activated afterwards if a custom interval has been set in the manual advanced setup")
         config.Setup.set("default_mp_poller_interval", 0, False) #Using False to prevent the config file from being created before first time setup
-    else:
-        logging.basicConfig(format="%(asctime)s.%(msecs)03d | %(levelname)-8s | %(name)-14s | %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
-        setup_logger()
 
     _LOG.debug("Starting driver")
 
