@@ -10,6 +10,7 @@ import ucapi
 import config
 import driver
 import projector
+import adcp as ADCP
 
 _LOG = logging.getLogger(__name__)
 
@@ -18,10 +19,10 @@ _LOG = logging.getLogger(__name__)
 async def add(device_id: str):
     """Function to add a media player entity with the config.MpDef class definition"""
 
-    mp_name = config.Devices.get(device_id=device_id, key="name")
+    mp_name = config.Devices.get(device_id=device_id, key=config.DevicesKeys.NAME)
     mp_id= device_id
 
-    definition = config.MediaPlayer().get_def(ent_id=mp_id, name=mp_name)
+    definition = config.EntityDefinitions.MediaPlayer().get_def(ent_id=mp_id, name=mp_name)
 
     driver.api.available_entities.add(definition)
 
@@ -32,10 +33,10 @@ async def add(device_id: str):
 async def remove(device_id: str):
     """Function to remove a media player entity with the config.MpDef class definition"""
 
-    mp_name = config.Devices.get(device_id=device_id, key="name")
+    mp_name = config.Devices.get(device_id=device_id, key=config.DevicesKeys.NAME)
     mp_id= device_id
 
-    definition = config.MediaPlayer().get_def(ent_id=mp_id, name=mp_name)
+    definition = config.EntityDefinitions.MediaPlayer().get_def(ent_id=mp_id, name=mp_name)
 
     driver.api.available_entities.add(definition)
 
@@ -87,9 +88,9 @@ class MpPollerController:
         """Starts the mp_poller task. If the task is already running it will be stopped and restarted"""
 
         name = device_id + "-mp_poller"
-        mp_poller_interval = config.Devices.get(device_id=device_id, key="mp_poller_interval")
+        mp_poller_interval = config.Devices.get(device_id=device_id, key=config.DevicesKeys.MP_POLLER_INTERVAL)
         if mp_poller_interval is None:
-            mp_poller_interval = config.Setup.get("default_mp_poller_interval")
+            mp_poller_interval = config.Setup.get(config.Setup.Keys.DEFAULT_POLLER_INTERVAL_MEDIA_PLAYER)
 
         if mp_poller_interval == 0:
             _LOG.debug("Power/mute/input hours poller interval set to " + str(mp_poller_interval))
@@ -146,32 +147,65 @@ async def mp_poller(device_id: str, interval: int) -> None:
     """Projector attributes poller task"""
     while True:
         await driver.asyncio.sleep(interval)
-        if config.Setup.get("standby"):
+        if config.Setup.get(config.Setup.Keys.STANDBY):
             continue
         try:
             #TODO Implement check if there are too many timeouts/connection errors to the projector and automatically deactivate poller and set entity status to unknown
-            await update_mp(device_id)
+            await update_attributes(device_id)
         except Exception as e:
             _LOG.error(e)
             continue
 
 
 
-async def update_mp(device_id: str):
-    """Retrieve input source, power status and muted status from the projector, compare them with the known status on the remote and update them if necessary"""
+async def update_attributes(device_id: str):
+    """Retrieve input source, power status and muted status from the projector, compare them with the current entity attributes and update them if necessary"""
 
     if driver.api.configured_entities.get(device_id) is None:
         _LOG.info(f"Entity {device_id} not found in configured entities. Skip updating attributes")
         return True
 
+    _LOG.debug(f"Checking power/mute/input status for media player attributes for {device_id}")
     try:
-        _LOG.debug(f"Checking power/mute/input status for media player attributes poller task for {device_id}")
-        power = await projector.get_attr_power(device_id)
-        muted = await projector.get_attr_muted(device_id)
-        source = await projector.get_attr_source(device_id)
+        try:
+            power = await projector.get_setting(device_id, config.SensorTypes.POWER_STATUS)
+        except Exception as e:
+            _LOG.error(e)
+            _LOG.error(f"Can't get power state from projector. Set state to {ucapi.media_player.States.UNKNOWN}")
+            power = ucapi.media_player.States.UNKNOWN
+
+        try:
+            muted = await projector.get_setting(device_id, config.SensorTypes.PICTURE_MUTING)
+        except Exception as e:
+            _LOG.error(e)
+            _LOG.error("Can't get picture muting state from projector. Set state to False")
+            muted = False
+
+        try:
+            source = await projector.get_setting(device_id, config.SensorTypes.INPUT)
+        except Exception as e:
+            _LOG.error(e)
+            _LOG.error(f"Can't get input from projector. Set input to {config.Messages.ERROR}")
+            source = config.Messages.ERROR
+
+    except OSError as e:
+        raise OSError(e) from e
     except Exception as e:
-        power = {ucapi.remote.Attributes.STATE: ucapi.remote.States.UNAVAILABLE}
-        raise Exception(f"Could not check power/mute/input state for {device_id}: {e}") from e
+        _LOG.error(f"Can't get power state from projector. Set state to {ucapi.media_player.States.UNKNOWN}")
+        power = ucapi.media_player.States.UNKNOWN
+        raise Exception(e) from e
+
+    if muted == ADCP.Values.States.OFF.replace("\"",""):
+        muted = False
+    else:
+        muted = True
+
+    if source == ADCP.Values.Inputs.HDMI1.replace("\"",""):
+        source = config.Sources.HDMI_1
+    elif source == ADCP.Values.Inputs.HDMI2.replace("\"",""):
+        source = config.Sources.HDMI_2
+    else:
+        source = config.Sources.UNKNOWN
 
     try:
         stored_states = await driver.api.available_entities.get_states()
@@ -216,82 +250,4 @@ async def update_mp(device_id: str):
         _LOG.info(f"Updated entity attribute(s) {str(attributes_to_update)} for {device_id}")
 
     else:
-        _LOG.debug(f"No projector attributes for {device_id} to update. Skipping update process")
-
-
-#TODO Remove when 2.7.2 firmware or newer with sensor widgets is also available for R2
-async def update_video(device_id: str):
-    """Update video info data in media playback attributes"""
-
-    mp_id = device_id
-    no_signal = False
-    muted = False
-
-    _LOG.info(f"Updating video signal infos for {device_id} in media player attributes")
-
-    if await projector.get_attr_muted(device_id):
-        muted = True
-
-    if muted:
-        _LOG.info(f"Video is muted for projector {device_id}")
-        attributes_to_send = {ucapi.media_player.Attributes.MEDIA_TITLE: "Video muted", \
-                                ucapi.media_player.Attributes.MEDIA_ARTIST: ""
-                                }
-    else:
-        try:
-            resolution = await projector.get_resolution(device_id)
-            if resolution == "Invalid":
-                resolution = "No signal"
-                no_signal = True
-        except Exception as e:
-            _LOG.warning(f"Failed to get video resolution from {device_id}")
-            resolution = "Error"
-            raise Exception(e) from e
-
-        if no_signal:
-            attributes_to_send = {ucapi.media_player.Attributes.MEDIA_TITLE: resolution, \
-                                ucapi.media_player.Attributes.MEDIA_ARTIST: ""
-                                }
-        else:
-            try:
-                dyn_range = await projector.get_dynamic_range(device_id)
-            except Exception as e:
-                _LOG.warning(f"Failed to get dynamic range from {device_id}")
-                dyn_range = "Error"
-                raise Exception(e) from e
-
-            try:
-                color_space = await projector.get_color_space(device_id)
-            except Exception as e:
-                _LOG.warning(f"Failed to get color space from {device_id}")
-                color_space = "Error"
-                raise Exception(e) from e
-
-            try:
-                color_format = await projector.get_color_format(device_id)
-            except Exception as e:
-                _LOG.warning(f"Failed to get color format from {device_id}")
-                color_format = "Error"
-                raise Exception(e) from e
-
-            try:
-                mode_2d_3d = await projector.get_mode_2d_3d(device_id)
-            except Exception as e:
-                _LOG.warning(f"Failed to get 2d/3d mode from {device_id}")
-                mode_2d_3d = "Error"
-                raise Exception(e) from e
-
-            attributes_to_send = {ucapi.media_player.Attributes.MEDIA_TITLE: f"{resolution} / {dyn_range}", \
-                                ucapi.media_player.Attributes.MEDIA_ARTIST: f"{color_space} / {color_format} / {mode_2d_3d}"
-                                }
-
-    try:
-        api_update_attributes = driver.api.configured_entities.update_attributes(mp_id, attributes_to_send)
-    except Exception as e:
-        _LOG.error(e)
-        raise Exception("Error while updating media player playback attributes for entity id " + mp_id) from e
-
-    if not api_update_attributes:
-        driver.api.available_entities.update_attributes(mp_id, attributes_to_send)
-
-    _LOG.info(f"Updated video signal infos for {device_id} media player playback attributes to {str(attributes_to_send)}")
+        _LOG.debug(f"No media player attributes for {device_id} to update. Skipping update process")

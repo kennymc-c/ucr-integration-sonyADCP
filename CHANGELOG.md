@@ -5,11 +5,50 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0] - 2026-02-28
+
+### ⚠️ Known issue
+
+- If random sensor and/or select entities are suddenly shown as unavailable after a restart please run the setup for the affected device again without changing anything. For Docker setups you can also stop and restart the integration.
+
+### ⚠️ Breaking
+
+- Removed video signal infos from media player playback attributes as sensors can be added as widgets to activities since firmware 2.7.2. Please use the video sensor instead
+- If you are running the integration externally (e.g. Docker) you need to delete config.json and run the setup again
+  - Don't panic: No entity ids have been changed!
+- Renamed `UPDATE_SETTING_SENS` simple command to `UPDATE_ALL_SENSORS` as it now updates all sensors and not only some of them
+  - This requires re-mapping this command in activities and macros
+
+### Added
+
+- Added 20 select entities (if the setting is supported by your model):
+  - This needs firmware 2.8.3 or never
+  - Available and current options will be updated when the projector is powered on or off, the input is changed, picture is muted muted or when a send command/send command sequence command from the remote entity has been received
+    - Use the `UPDATE_SELECT_OPTION` simple command to update all sensors manually
+- Added sensors for input and laser/iris brightness
+  - Iris brightness has not been tested with a supported model. Therefore the value shown by the sensor may not match the one in the projector menu. Please report any issues with the iris brightness sensor so these can be fixed
+- Added simple commands for iris brightness and contrast/dynamic HDR enhancer
+  - Iris brightness has not been tested with a supported model. Therefore the up/down intervals might be too big/small. Currently it uses the same scale and interval as laser brightness. Please report any issues with the iris brightness command so these can be fixed
+
+### Fixed
+
+- Fixed remote entity power state not updating
+- Fixed pictures mode button positions on remote user interface page
+- Fixed device class of binary sensors
+
+### Changed
+
+- Internal code cleanup, simplification and type-safe measurements
+- Removed entity ids and names from config file and generate them at startup to prevent large configuration files
+- Updated ucapi Python library to 0.5.2
+- Updated UC r2-pyinstaller image in build workflow to 3.11.13-0.5.0
+- Updated upload/download build actions
+
 ## [1.4.1] - 2026-01-24
 
 ### Fixed
 
-- Fixed an issue where some sensors are shown as unavailable a restart of the integration/remote
+- Fixed an issue where some sensors are shown as unavailable after a restart of the integration/remote
 
 ### Changed
 
@@ -18,7 +57,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Added sensors for gamma, color space and color temperature
-  - These sensors will be updated either with the global `UPDATE_SETTING_SENS` simple command or if a send command/send command sequence command has been received which allows you to send raw ADCP commands like changing these settings. There are no deticated simple commands to change gamma, color space and temperature
+  - These sensors will be updated either with the global `UPDATE_SETTING_SENS` simple command or if a send command/send command sequence command has been received which allows you to send raw ADCP commands like changing these settings. There are no dedicated simple commands to change gamma, color space and temperature
 
 ## [1.4.0] - 2026-01-05
 

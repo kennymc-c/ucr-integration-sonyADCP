@@ -12,12 +12,12 @@ import config
 import driver
 import projector
 import media_player
-import sensor
 import remote
+import sensor
+import selects
 import adcp as ADCP
 
 _LOG = logging.getLogger(__name__)
-
 
 
 async def init():
@@ -39,40 +39,41 @@ async def driver_setup_handler(msg: ucapi.SetupDriver) -> ucapi.SetupAction:
 
     if isinstance(msg, ucapi.DriverSetupRequest):
         if msg.reconfigure:
-            config.Setup.set("setup_reconfigure", True)
+            config.Setup.set(config.Setup.Keys.SETUP_RECONFIGURE, True)
             return await show_setup_action()
-        config.Setup.set("setup_reconfigure", False)
+        config.Setup.set(config.Setup.Keys.SETUP_RECONFIGURE, False)
         return await show_setup_basic()
     if isinstance(msg, ucapi.UserDataResponse):
-        if config.Setup.get("setup_step") == "basic" or config.Setup.get("setup_step") == "basic_reconfigure":
+        if config.Setup.get(config.Setup.Keys.SETUP_STEP) == config.SetupSteps.basic or config.Setup.get(config.Setup.Keys.SETUP_STEP) == config.SetupSteps.basic_reconfigure:
             return await handle_response_basic(msg)
-        if config.Setup.get("setup_step") == "advanced" or config.Setup.get("setup_step") == "advanced_reconfigure":
+        if config.Setup.get(config.Setup.Keys.SETUP_STEP) == config.SetupSteps.advanced or \
+            config.Setup.get(config.Setup.Keys.SETUP_STEP) == config.SetupSteps.advanced_reconfigure:
             return await handle_response_advanced(msg)
-        if config.Setup.get("setup_step") == "action":
+        if config.Setup.get(config.Setup.Keys.SETUP_STEP) == config.SetupSteps.action:
             return await handle_response_action(msg)
-        if config.Setup.get("setup_step") == "choose_device":
+        if config.Setup.get(config.Setup.Keys.SETUP_STEP) == config.SetupSteps.choose_device:
             return await handle_response_choose_device(msg)
     elif isinstance(msg, ucapi.AbortDriverSetup):
         _LOG.info("Setup was aborted with code: %s", msg.error)
 
     _LOG.error("Error during setup")
-    config.Setup.set("setup_complete", False)
+    config.Setup.set(config.Setup.Keys.SETUP_COMPLETE, False)
 
-    if config.Setup.get("setup_temp_device") != "":
+    if config.Setup.get(config.Setup.Keys.SETUP_TEMP_DEVICE_NAME) != "":
         _LOG.info("Removing the setup temp device from config and stopping poller tasks for this device")
-        await media_player.MpPollerController.stop(config.Setup.get("setup_temp_device"))
-        await sensor.HealthPollerController.stop(config.Setup.get("setup_temp_device"))
+        await media_player.MpPollerController.stop(config.Setup.get(config.Setup.Keys.SETUP_TEMP_DEVICE_NAME))
+        await sensor.HealthPollerController.stop(config.Setup.get(config.Setup.Keys.SETUP_TEMP_DEVICE_NAME))
         try:
-            config.Devices.remove(config.Setup.get("setup_temp_device"))
+            config.Devices.remove(config.Setup.get(config.Setup.Keys.SETUP_TEMP_DEVICE_NAME))
         except ValueError:
             pass
 
-    config.Setup.set("setup_step", "init")
-    config.Setup.set("setup_auto_discovery", False)
+    config.Setup.set(config.Setup.Keys.SETUP_STEP, config.SetupSteps.init)
+    config.Setup.set(config.Setup.Keys.SETUP_AUTO_DISCOVERY, False)
 
-    if config.Setup.get("setup_reconfigure") is True:
+    if config.Setup.get(config.Setup.Keys.SETUP_RECONFIGURE) is True:
         _LOG.info("Resetting reconfigure setup device id")
-        config.Setup.set("setup_reconfigure_device", "")
+        config.Setup.set(config.Setup.Keys.SETUP_RECONFIGURE_DEVICE, "")
 
     return ucapi.SetupError()
 
@@ -96,12 +97,12 @@ async def show_setup_action() -> ucapi.SetupAction:
 
     try:
         for device_id in config.Devices.list():
-            name = config.Devices.get(device_id, "name")
+            name = config.Devices.get(device_id, config.DevicesKeys.NAME)
             configured_devices.append({"id": device_id, "label": {"en": name}})
     except Exception:
         return ucapi.SetupError()
 
-    config.Setup.set("setup_step", "action")
+    config.Setup.set(config.Setup.Keys.SETUP_STEP, config.SetupSteps.action)
 
     return ucapi.RequestUserInput(
         {
@@ -132,7 +133,7 @@ async def show_setup_action() -> ucapi.SetupAction:
                         },
             },
             {
-                "id": "action",
+                "id": config.SetupSteps.action,
                 "label": {
                     "en": "Action:",
                     "de": "Aktion:"
@@ -156,7 +157,7 @@ async def handle_response_action(msg: ucapi.DriverSetupRequest,) -> ucapi.SetupA
     :return: the setup action on how to continue
     """
 
-    action = msg.input_values["action"]
+    action = msg.input_values[config.SetupSteps.action]
     device_id = msg.input_values["device"]
 
     if action == "add":
@@ -165,7 +166,7 @@ async def handle_response_action(msg: ucapi.DriverSetupRequest,) -> ucapi.SetupA
 
     if action == "reconfigure":
         _LOG.info(f"Re-configure device \"{device_id}\"")
-        config.Setup.set("setup_reconfigure_device", device_id)
+        config.Setup.set(config.Setup.Keys.SETUP_RECONFIGURE_DEVICE, device_id)
         return await show_setup_basic(device_id)
 
 
@@ -180,16 +181,17 @@ async def show_setup_basic(device_id = None) -> ucapi.SetupAction:
 
     if device_id is None:
         _LOG.info("Starting basic setup for a new device")
+
         ip = ""
         adcp_password = ""
 
-        config.Setup.set("setup_step", "basic")
+        config.Setup.set(config.Setup.Keys.SETUP_STEP, config.SetupSteps.basic)
     else:
         _LOG.info(F"Starting basic reconfigure setup for device \"{device_id}\"")
-        ip = config.Devices.get(device_id, "ip")
-        adcp_password = config.Setup.get("setup_masked_password")
+        ip = config.Devices.get(device_id, config.DevicesKeys.IP)
+        adcp_password = config.Setup.get(config.Setup.Keys.SETUP_PASSWORD_MASKED)
 
-        config.Setup.set("setup_step", "basic_reconfigure")
+        config.Setup.set(config.Setup.Keys.SETUP_STEP, config.SetupSteps.basic_reconfigure)
 
     #BUG Masked: True works in FYTA integration but not documented in the asyncapi documentation:
     # https://github.com/FYTA-GmbH/uc-integration-fyta/blob/31e27e660d56243c4fe6158220f036a2cdb3f340/driver.py#L199
@@ -274,7 +276,7 @@ async def handle_response_basic(msg: ucapi.UserDataResponse) -> ucapi.SetupActio
     """
 
     ip = msg.input_values["ip"]
-    adcp_password = msg.input_values["adcp_password"]
+    adcp_password = msg.input_values[config.DevicesKeys.ADCP_PASSWORD]
     advanced_settings = msg.input_values["advanced_settings"]
 
     if ip != "":
@@ -288,33 +290,33 @@ async def handle_response_basic(msg: ucapi.UserDataResponse) -> ucapi.SetupActio
             return ucapi.SetupError(error_type=ucapi.IntegrationSetupError.NOT_FOUND)
     else:
         _LOG.info("No ip address entered. Using auto discovery mode")
-        config.Setup.set("setup_auto_discovery", True)
+        config.Setup.set(config.Setup.Keys.SETUP_AUTO_DISCOVERY, True)
 
-    if ip != "" and config.Setup.get("setup_step") == "basic":
-        config.Devices.add(entity_data={"ip": ip})
+    if ip != "" and config.Setup.get(config.Setup.Keys.SETUP_STEP) == config.SetupSteps.basic:
+        config.Devices.add(entity_data={config.DevicesKeys.IP: ip})
 
-    if config.Setup.get("setup_step") == "basic_reconfigure":
-        device_id = config.Setup.get("setup_reconfigure_device")
-        current_ip = config.Devices.get(device_id, "ip")
+    if config.Setup.get(config.Setup.Keys.SETUP_STEP) == config.SetupSteps.basic_reconfigure:
+        device_id = config.Setup.get(config.Setup.Keys.SETUP_RECONFIGURE_DEVICE)
+        current_ip = config.Devices.get(device_id, config.DevicesKeys.IP)
         if ip == current_ip :
             _LOG.debug("IP has not been changed")
         else:
-            config.Devices.add(device_id=device_id, entity_data={"ip": ip})
+            config.Devices.add(device_id=device_id, entity_data={config.DevicesKeys.IP: ip})
 
     if adcp_password == "":
         _LOG.info("No ADCP password entered. Assuming ADCP authentication is not enabled")
     else:
-        if config.Setup.get("setup_step") == "basic_reconfigure":
-            device_id = config.Setup.get("setup_reconfigure_device")
-            if adcp_password != config.Setup.get("setup_masked_password"):
-                config.Devices.add(device_id=device_id, entity_data={"adcp_password": adcp_password})
+        if config.Setup.get(config.Setup.Keys.SETUP_STEP) == config.SetupSteps.basic_reconfigure:
+            device_id = config.Setup.get(config.Setup.Keys.SETUP_RECONFIGURE_DEVICE)
+            if adcp_password != config.Setup.get(config.Setup.Keys.SETUP_PASSWORD_MASKED):
+                config.Devices.add(device_id=device_id, entity_data={config.DevicesKeys.ADCP_PASSWORD: adcp_password})
             else:
                 _LOG.debug("ADCP password has not been changed")
         else:
-            config.Devices.add(entity_data={"adcp_password": adcp_password})
+            config.Devices.add(entity_data={config.DevicesKeys.ADCP_PASSWORD: adcp_password})
 
     if advanced_settings == "false":
-        if config.Setup.get("setup_auto_discovery") is False:
+        if config.Setup.get(config.Setup.Keys.SETUP_AUTO_DISCOVERY) is False:
             return await validate_entity_data()
         return await query_projector_data()
 
@@ -329,29 +331,29 @@ async def show_setup_advanced():
     _LOG.info("Show advanced setup settings")
 
     try:
-        if config.Setup.get("setup_step") == "basic_reconfigure":
-            device_id = config.Setup.get("setup_reconfigure_device")
-            adcp_port = config.Devices.get(device_id, "adcp_port")
-            adcp_timeout = config.Devices.get(device_id, "adcp_timeout")
-            sdap_port = config.Devices.get(device_id, "sdap_port")
-            mp_poller_interval = config.Devices.get(device_id, "mp_poller_interval")
-            health_poller_interval = config.Devices.get(device_id, "health_poller_interval")
-            config.Setup.set("setup_step", "advanced_reconfigure")
+        if config.Setup.get(config.Setup.Keys.SETUP_STEP) == config.SetupSteps.basic_reconfigure:
+            device_id = config.Setup.get(config.Setup.Keys.SETUP_RECONFIGURE_DEVICE)
+            adcp_port = config.Devices.get(device_id, config.DevicesKeys.ADCP_PORT)
+            adcp_timeout = config.Devices.get(device_id, config.DevicesKeys.ADCP_TIMEOUT)
+            sdap_port = config.Devices.get(device_id, config.DevicesKeys.SDAP_PORT)
+            mp_poller_interval = config.Devices.get(device_id, config.DevicesKeys.MP_POLLER_INTERVAL)
+            health_poller_interval = config.Devices.get(device_id, config.DevicesKeys.HEALTH_POLLER_INTERVAL)
+            config.Setup.set(config.Setup.Keys.SETUP_STEP, config.SetupSteps.advanced_reconfigure)
         else:
-            adcp_port = config.Setup.get("default_adcp_port")
-            adcp_timeout = config.Setup.get("default_adcp_timeout")
-            sdap_port = config.Setup.get("default_sdap_port")
-            mp_poller_interval = config.Setup.get("default_mp_poller_interval")
-            health_poller_interval = config.Setup.get("default_health_poller_interval")
-            config.Setup.set("setup_step", "advanced")
+            adcp_port = config.Setup.get(config.Setup.Keys.DEFAULT_ADCP_PORT)
+            adcp_timeout = config.Setup.get(config.Setup.Keys.DEFAULT_ADCP_TIMEOUT)
+            sdap_port = config.Setup.get(config.Setup.Keys.DEFAULT_SDAP_PORT)
+            mp_poller_interval = config.Setup.get(config.Setup.Keys.DEFAULT_POLLER_INTERVAL_MEDIA_PLAYER)
+            health_poller_interval = config.Setup.get(config.Setup.Keys.DEFAULT_POLLER_INTERVAL_HEALTH)
+            config.Setup.set(config.Setup.Keys.SETUP_STEP, config.SetupSteps.advanced)
     except ValueError as v:
         _LOG.error(v)
 
-    adcp_port = adcp_port if adcp_port is not None else config.Setup.get("default_adcp_port")
-    adcp_timeout = adcp_timeout if adcp_timeout is not None else config.Setup.get("default_adcp_timeout")
-    sdap_port = sdap_port if sdap_port is not None else config.Setup.get("default_sdap_port")
-    mp_poller_interval = mp_poller_interval if mp_poller_interval is not None else config.Setup.get("default_mp_poller_interval")
-    health_poller_interval = health_poller_interval if health_poller_interval is not None else config.Setup.get("default_health_poller_interval")
+    adcp_port = adcp_port if adcp_port is not None else config.Setup.get(config.Setup.Keys.DEFAULT_ADCP_PORT)
+    adcp_timeout = adcp_timeout if adcp_timeout is not None else config.Setup.get(config.Setup.Keys.DEFAULT_ADCP_TIMEOUT)
+    sdap_port = sdap_port if sdap_port is not None else config.Setup.get(config.Setup.Keys.DEFAULT_SDAP_PORT)
+    mp_poller_interval = mp_poller_interval if mp_poller_interval is not None else config.Setup.get(config.Setup.Keys.DEFAULT_POLLER_INTERVAL_MEDIA_PLAYER)
+    health_poller_interval = health_poller_interval if health_poller_interval is not None else config.Setup.get(config.Setup.Keys.DEFAULT_POLLER_INTERVAL_HEALTH)
 
     #TODO Report bug to UC that \n\n in field text is causing an ui formatting error in the web configurator (wrong font and alignment offset too far to the right)
     return ucapi.RequestUserInput(
@@ -446,7 +448,7 @@ async def handle_response_advanced(msg: ucapi.UserDataResponse) -> ucapi.SetupAc
     """ Process user data response in a setup process for advanced settings"""
 
     try:
-        device_id = config.Setup.get("setup_reconfigure_device")
+        device_id = config.Setup.get(config.Setup.Keys.SETUP_RECONFIGURE_DEVICE)
     except ValueError:
         device_id = None
 
@@ -459,53 +461,53 @@ async def handle_response_advanced(msg: ucapi.UserDataResponse) -> ucapi.SetupAc
 
     skip_entities = False
 
-    if config.Setup.get("setup_step") == "advanced_reconfigure":
-        if config.Devices.get(device_id, "adcp_port") is None and config.Devices.get(device_id, "sdap_port") is None:
+    if config.Setup.get(config.Setup.Keys.SETUP_STEP) == config.SetupSteps.advanced_reconfigure:
+        if config.Devices.get(device_id, config.DevicesKeys.ADCP_PORT) is None and config.Devices.get(device_id, config.DevicesKeys.SDAP_PORT) is None:
             skip_entities = True
         else:
-            if ip == config.Devices.get(device_id, "ip") and adcp_port == config.Devices.get(device_id, "adcp_port") \
-            and sdap_port == config.Devices.get(device_id, "sdap_port"):
+            if ip == config.Devices.get(device_id, config.DevicesKeys.IP) and adcp_port == config.Devices.get(device_id, config.DevicesKeys.ADCP_PORT) \
+            and sdap_port == config.Devices.get(device_id, config.DevicesKeys.SDAP_PORT):
                 _LOG.info("No entity validation related values have been changed. Skipping entity validation and creation")
                 skip_entities = True
 
     try:
         if skip_entities is False:
 
-            if adcp_port != config.Setup.get("default_adcp_port"):
-                config.Devices.add(device_id=device_id, entity_data={"adcp_port": adcp_port})
+            if adcp_port != config.Setup.get(config.Setup.Keys.DEFAULT_ADCP_PORT):
+                config.Devices.add(device_id=device_id, entity_data={config.DevicesKeys.ADCP_PORT: adcp_port})
             else:
                 #Remove existing value if it is changed back to the default value
-                if config.Devices.get(device_id=device_id, key="adcp_port") is not None:
+                if config.Devices.get(device_id=device_id, key=config.DevicesKeys.ADCP_PORT) is not None:
                     _LOG.debug("ADCP port has been changed back to default value. Removing from config")
-                    config.Devices.remove(device_id=device_id, key="adcp_port")
+                    config.Devices.remove(device_id=device_id, key=config.DevicesKeys.ADCP_PORT)
 
-            if sdap_port != config.Setup.get("default_sdap_port"):
-                config.Devices.add(device_id=device_id, entity_data={"sdap_port": sdap_port})
+            if sdap_port != config.Setup.get(config.Setup.Keys.DEFAULT_SDAP_PORT):
+                config.Devices.add(device_id=device_id, entity_data={config.DevicesKeys.SDAP_PORT: sdap_port})
             else:
-                if config.Devices.get(device_id=device_id, key="sdap_port") is not None:
+                if config.Devices.get(device_id=device_id, key=config.DevicesKeys.SDAP_PORT) is not None:
                     _LOG.debug("SDAP port has been changed back to default value. Removing from config")
-                    config.Devices.remove(device_id=device_id, key="sdap_port")
+                    config.Devices.remove(device_id=device_id, key=config.DevicesKeys.SDAP_PORT)
 
-        if adcp_timeout != config.Setup.get("default_adcp_timeout"):
-            config.Devices.add(device_id=device_id, entity_data={"adcp_timeout": adcp_timeout})
+        if adcp_timeout != config.Setup.get(config.Setup.Keys.DEFAULT_ADCP_TIMEOUT):
+            config.Devices.add(device_id=device_id, entity_data={config.DevicesKeys.ADCP_TIMEOUT: adcp_timeout})
         else:
-            if config.Devices.get(device_id=device_id, key="adcp_timeout") is not None:
+            if config.Devices.get(device_id=device_id, key=config.DevicesKeys.ADCP_TIMEOUT) is not None:
                 _LOG.debug("ADCP timeout has been changed back to default value. Removing from config")
-                config.Devices.remove(device_id=device_id, key="adcp_timeout")
+                config.Devices.remove(device_id=device_id, key=config.DevicesKeys.ADCP_TIMEOUT)
 
-        if mp_poller_interval != config.Setup.get("default_mp_poller_interval"):
-            config.Devices.add(device_id=device_id, entity_data={"mp_poller_interval": mp_poller_interval})
+        if mp_poller_interval != config.Setup.get(config.Setup.Keys.DEFAULT_POLLER_INTERVAL_MEDIA_PLAYER):
+            config.Devices.add(device_id=device_id, entity_data={config.DevicesKeys.MP_POLLER_INTERVAL: mp_poller_interval})
         else:
-            if config.Devices.get(device_id=device_id, key="mp_poller_interval") is not None:
+            if config.Devices.get(device_id=device_id, key=config.DevicesKeys.MP_POLLER_INTERVAL) is not None:
                 _LOG.debug("Mp poller interval has been changed back to default value. Removing from config")
-                config.Devices.remove(device_id=device_id, key="mp_poller_interval")
+                config.Devices.remove(device_id=device_id, key=config.DevicesKeys.MP_POLLER_INTERVAL)
 
-        if health_poller_interval != config.Setup.get("default_health_poller_interval"):
-            config.Devices.add(device_id=device_id, entity_data={"health_poller_interval": health_poller_interval})
+        if health_poller_interval != config.Setup.get(config.Setup.Keys.DEFAULT_POLLER_INTERVAL_HEALTH):
+            config.Devices.add(device_id=device_id, entity_data={config.DevicesKeys.HEALTH_POLLER_INTERVAL: health_poller_interval})
         else:
-            if config.Devices.get(device_id=device_id, key="health_poller_interval") is not None:
+            if config.Devices.get(device_id=device_id, key=config.DevicesKeys.HEALTH_POLLER_INTERVAL) is not None:
                 _LOG.debug("Lt poller interval has been changed back to default value. Removing from config")
-                config.Devices.remove(device_id=device_id, key="health_poller_interval")
+                config.Devices.remove(device_id=device_id, key=config.DevicesKeys.HEALTH_POLLER_INTERVAL)
 
     except ValueError as v:
         _LOG.error(v)
@@ -545,7 +547,7 @@ async def query_projector_data():
     :ip: If empty the ip retrieved via SDAP will be used
     """
 
-    if not config.Setup.get("setup_auto_discovery"):
+    if not config.Setup.get(config.Setup.Keys.SETUP_AUTO_DISCOVERY):
         return await validate_entity_data()
 
     _LOG.info("Query ip, model name and serial number from projector via SDAP advertisement service")
@@ -561,14 +563,14 @@ async def query_projector_data():
 
         if devices and len(devices) > 1:
             _LOG.info("More than one projector have been discovered")
-            config.Setup.set("setup_step", "choose_device")
+            config.Setup.set(config.Setup.Keys.SETUP_STEP, config.SetupSteps.choose_device)
 
             devices_dropdown = []
             for device in devices:
                 name = device["model"]
                 ip = device["ip"]
                 devices_dropdown.append({"id": ip, "label": {"en": f"{name} ({ip})"}})
-                #TODO Add a check if the ip is already in the config file and remove it from devices_dropdown
+                #TODO Add a check if the ip is already in the config file and remove it from devices_dropdown or mark them as already configured
 
             return ucapi.RequestUserInput(
             {
@@ -606,7 +608,7 @@ async def query_projector_data():
         if device["ip"] != "":
             ip = device["ip"]
             _LOG.info("Automatic discovered IP: " + ip)
-            config.Devices.add(entity_data={"ip": ip})
+            config.Devices.add(entity_data={config.DevicesKeys.IP: ip})
         else:
             raise ValueError("Got empty ip from projector")
 
@@ -629,7 +631,7 @@ async def handle_response_choose_device(msg: ucapi.UserDataResponse) -> ucapi.Se
     ip = msg.input_values["device"]
 
     try:
-        config.Devices.add(entity_data={"ip": ip})
+        config.Devices.add(entity_data={config.DevicesKeys.IP: ip})
     except Exception as e:
         raise Exception(e) from e
 
@@ -643,18 +645,18 @@ async def validate_entity_data(model:str = None, serial:str = None):
     skip_entities = False
 
     try:
-        config.Setup.get("setup_reconfigure_device")
+        config.Setup.get(config.Setup.Keys.SETUP_RECONFIGURE_DEVICE)
     except ValueError:
         device_id = None
-        adcp_port = config.Devices.get(key="adcp_port")
-        ip = config.Devices.get(key="ip")
+        adcp_port = config.Devices.get(key=config.DevicesKeys.ADCP_PORT)
+        ip = config.Devices.get(key=config.DevicesKeys.IP)
     else:
         skip_entities = True
-        device_id = config.Setup.get("setup_reconfigure_device")
-        adcp_port = config.Devices.get(device_id, "adcp_port")
-        ip = config.Devices.get(device_id, "ip")
+        device_id = config.Setup.get(config.Setup.Keys.SETUP_RECONFIGURE_DEVICE)
+        adcp_port = config.Devices.get(device_id, config.DevicesKeys.ADCP_PORT)
+        ip = config.Devices.get(device_id, config.DevicesKeys.IP)
 
-    adcp_port = adcp_port if adcp_port is not None else config.Setup.get("default_adcp_port")
+    adcp_port = adcp_port if adcp_port is not None else config.Setup.get(config.Setup.Keys.DEFAULT_ADCP_PORT)
 
     #Check if adcp port is open
     if not port_check(ip, adcp_port):
@@ -665,22 +667,22 @@ async def validate_entity_data(model:str = None, serial:str = None):
     #Check if ADCP password is correct with a test command
     _LOG.info("Sending ADCP test command")
     try:
-        await projector.get_light_source_hours(device_id)
+        await projector.get_setting(device_id, config.SensorTypes.LIGHT_TIMER)
     except Exception as e:
         error = str(e)
         if error:
             _LOG.error(error)
         _LOG.error("Test command failed")
-        raise type(e)(error) from e
+        raise
 
     if not skip_entities:
         if model is None and serial is None:
             _LOG.info("Retrieving model name and serial number via ADCP commands")
             try:
-                model_raw = await projector.projector_def(device_id).command(ADCP.Get.MODEL)
-                serial_raw = await projector.projector_def(device_id).command(ADCP.Get.SERIAL)
-            except Exception as e:
-                raise type(e)(str(e)) from e
+                model_raw = await projector.projector_def(device_id).command(ADCP.Commands.Query.MODEL, ADCP.Parameters.QUERY)
+                serial_raw = await projector.projector_def(device_id).command(ADCP.Commands.Query.SERIAL, ADCP.Parameters.QUERY)
+            except Exception:
+                raise
 
             model = model_raw.strip("\"")
             serial = serial_raw.strip("\"")
@@ -692,7 +694,7 @@ async def validate_entity_data(model:str = None, serial:str = None):
         _LOG.debug("Device ID: " + device_id)
         _LOG.debug("Device Name: " + device_name)
 
-        config.Devices.add(new_device_id=device_id, entity_data={"name": device_name})
+        config.Devices.add(new_device_id=device_id, entity_data={config.DevicesKeys.NAME: device_name})
 
         return await complete_setup(device_id=device_id, skip_entities=skip_entities)
 
@@ -721,22 +723,27 @@ async def complete_setup(device_id:str = None, skip_entities:bool = False) -> uc
 
     if not skip_entities and device_id is not None:
         try:
-            config.Devices.set_remote_and_sensor_data(device_id=device_id)
+            config.Devices.set_entity_name_data(device_id=device_id)
         except ValueError as v:
             _LOG.error(v)
             return ucapi.SetupError()
 
         await media_player.add(device_id)
+
         await remote.add(device_id)
-        for sensor_type in config.Setup.get("sensor_types"):
+
+        for sensor_type in config.SensorTypes.get_all():
             await sensor.add(device_id, sensor_type)
 
-    if config.Setup.get("setup_reconfigure") is True:
+        for select_type in config.SelectTypes.get_all():
+            await selects.add(device_id, select_type)
+
+    if config.Setup.get(config.Setup.Keys.SETUP_RECONFIGURE) is True:
         #During the initial setup all needed pollers tasks will be started with the subscribe entities event when they get added as configured entities on the remote
         await media_player.MpPollerController.start(device_id)
         await sensor.HealthPollerController.start(device_id)
 
-    config.Setup.set("setup_complete", True)
+    config.Setup.set(config.Setup.Keys.SETUP_COMPLETE, True)
     _LOG.info("Setup complete")
 
     return ucapi.SetupComplete()

@@ -403,4 +403,3 @@ launch.json
 .venv/
 manual-build+upload.sh
 manual-register.sh
-refresh--v1.png

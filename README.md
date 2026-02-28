@@ -52,7 +52,6 @@ Using [uc-integration-api](https://github.com/aitatoi/integration-python-library
 - [Resources](#resources)
   - [ADCP protocol manual](#adcp-protocol-manual)
   - [ADCP supported commands list](#adcp-supported-commands-list)
-- [Planned improvements](#planned-improvements)
 - [Credits](#credits)
 - [Contributions](#contributions)
 - [License](#license)
@@ -93,7 +92,6 @@ Please note that when running this integration on the remote the power/mute/inpu
 
 - Media player
   - Source select feature to choose the input from a list
-  - Shows video signal infos in the media widget. Tap the refresh symbol to update the widget or use the UPDATE_VIDEO_INFO command
 - Remote
   - Pre-defined buttons mappings and ui pages with all available commands that can be customized in the web configurator
   - Send native ADCP commands via the send command and send command sequence command (useful for commands thats are not available as simple commands)
@@ -101,30 +99,36 @@ Please note that when running this integration on the remote the power/mute/inpu
   - Support for repeat, delay and hold
     - Hold just repeats the command continuously for the given hold time. There is no native hold function for the ADCP protocol as with some ir devices to activate additional functions
 - Sensors
-  - Health sensors
-    - Light source timer
-    - Temperature
-      - The sensor will only be added as available entity if your model can provide temperature data
-    - System status (error and warning messages from the projector)
+  - Health
     - All health sensors will be updated every time the projector is powered on or off by the remote and automatically every 30 minutes (can be changed in the advanced setup) while the projector is powered on and the remote is not in sleep/standby mode or the integration is disconnected
+    - Health sensors:
+      - Light source timer
+      - Temperature
+        - The sensor will only be added as available entity if your model can provide temperature data
+      - System status (error and warning messages from the projector)
   - Video signal
     - Shows the current resolution, framerate, dynamic range format, color space, color format and 2D/3D status
     - Video signal data is automatically updated when the projector or video muting is turned on or off and when the input is changed
+      - Use the `UPDATE_VIDEO_INFO` simple command to update the sensor manually
   - Setting sensors
     - Each sensor will be updated every time a corresponding command is triggered
-    - All sensors will be updated if the projector is powered on or off or if a send command/send command sequence command from the remote entity has been received
-      - You can also manually update all setting sensors at once with a dedicated simple command
+    - All sensors will be updated when the projector is powered on or off or when a send command/send command sequence command from the remote entity has been received
+      - Use the `UPDATE_SETTING_SENS` simple command to update the sensor manually
     - The following sensors are available if the setting is supported by your model:
       - Power Status
+      - Input
       - Picture Muting
       - Picture Preset
       - Picture Position
       - Aspect
       - HDR Status
       - HDR Dynamic Tone Mapping
+      - Dynamic Contrast / HDR Enhancer
       - Lamp Control
       - Dynamic Iris Control
       - Dynamic Light Control
+      - Laser Brightness
+      - Iris Brightness
       - Motionflow
       - 2D/3D Mode
       - 3D Format
@@ -133,8 +137,31 @@ Please note that when running this integration on the remote the power/mute/inpu
       - Color Temperature
       - Color Space
       - Gamma
-    - If a setting is not supported by the projector model the corresponding sensor is not added as available entity
     - Sensors for laser dimming and lens control are not included as their current values can't be polled through ADCP
+  - Select
+    - Available and current options will be updated when the projector is powered on or off, the input is changed or muted or when a send command/send command sequence command from the remote entity has been received
+    - All select entities will be updated when the projector is powered on or off or when a send command/send command sequence command from the remote entity has been received
+      - Use the `UPDATE_SELECT_OPTION` simple command to update the sensor manually
+    - The following select entities are available if the setting is supported by your model:
+      - Power
+      - Input
+      - Picture Muting
+      - Picture Preset
+      - Aspect
+      - Picture Position Select & Save
+      - HDR Format
+      - HDR Dynamic Tone Mapping
+      - Lamp Control
+      - Dynamic Iris Control
+      - Dynamic Light Control
+      - Dynamic Contrast/HDR Enhancer
+      - Motionflow
+      - 3D Format
+      - Input Lag Reduction
+      - Menu Position
+      - Color Temperature
+      - Color Space
+      - Gamma
 
 ## Commands & attributes
 
@@ -173,12 +200,16 @@ Please note that when running this integration on the remote the power/mute/inpu
   - On, Off, Auto, HDR10, HDR Ref, HLG
 - HDR Dynamic Tone Mapping* ***
   - Mode 1, 2, 3, Off
+- Dynamic Iris/Light Source Control* ***
+  - Off, Full, Limited
+- Contrast / Dynamic HDR Enhancer* ** ***
+  - Off, Low, Mid, High
 - Lamp Control* ***
   - High, Low
 - Laser Dimming* ***
   - Up, Down
-- Dynamic Iris/Light Source Control * ***
-  - Off, Full, Limited
+- Iris Brightness* ***
+  - Up, Down
 - Motionflow*
   - Off, Smooth High, Smooth Low, Impulse\*\*\*, Combination\***, True Cinema
 - 2D/3D Display Select** ***
@@ -207,8 +238,10 @@ If a command can't be processed or applied by the projector this will result in 
 - On, Off, Toggle
 - Send command
   - Simple command names have to be in upper case
+  - Sending raw ADCP commands is supported
 - Send command sequence
   - Simple command names have to be in upper case and separated by a comma
+  - Sending raw ADCP commands is supported
 
 You can also send native ADCP commands with the send command and send command sequence commands. This is useful for commands that are not available as simple commands or need a specific value. Please refer to the [ADCP supported commands list](#adcp-supported-commands-list) for a list of all commands for your projector model.
 
@@ -216,30 +249,30 @@ You can also send native ADCP commands with the send command and send command se
 
 _The default button mappings and ui pages can be customized in the web configurator._
 
-| Button                  | Short Press command | Long Press command |
-|-------------------------|---------------------|--------------------|
-| BACK                    | Cursor Left | |
-| HOME                    | Menu |  |
-| VOICE                   | | |
-| VOLUME_UP/DOWN          | | |
-| MUTE                    | Toggle Picture Muting | |
-| DPAD_UP/DOWN/LEFT/RIGHT | Cursor Up/Down/Left/Right | |
-| DPAD_MIDDLE             | Cursor Enter |  |
-| GREEN                   |              |  |
-| YELLOW                  |              |  |
-| RED                     |              |  |
-| BLUE                    |              |  |
-| CHANNEL_UP/DOWN         | Input HDMI 1/2 |  |
-| PREV                    | |  |
-| PLAY                    | |  |
-| NEXT                    | |  |
-| POWER                   | Power Toggle |  |
+| Button                  | Short Press command       | Long Press command |
+|-------------------------|---------------------------|--------------------|
+| BACK                    | Cursor Left               |                    |
+| HOME                    | Menu                      |                    |
+| VOICE                   |                           |                    |
+| VOLUME_UP/DOWN          |                           |                    |
+| MUTE                    | Toggle Picture Muting     |                    |
+| DPAD_UP/DOWN/LEFT/RIGHT | Cursor Up/Down/Left/Right |                    |
+| DPAD_MIDDLE             | Cursor Enter              |                    |
+| GREEN                   |                           |                    |
+| YELLOW                  |                           |                    |
+| RED                     |                           |                    |
+| BLUE                    |                           |                    |
+| CHANNEL_UP/DOWN         | Input HDMI 1/2            |                    |
+| PREV                    |                           |                    |
+| PLAY                    |                           |                    |
+| NEXT                    |                           |                    |
+| POWER                   | Power Toggle              |                    |
 
 ### Attributes poller
 
 #### Media player
 
-By default the integration checks the status of all media player entity attributes **every 20 seconds** while the remote is not in standby/sleep mode or disconnected from the integration. The interval can be changed in the advanced settings. Set it to 0 to deactivate this function. **When running on the remote as a custom integration the interval will be automatically set to 0 to reduce battery consumption and save cpu/memory usage.**
+By default the integration checks the status of all media player entity attributes **every 20 seconds** while the remote is not in standby/sleep mode or disconnected from the integration. The interval can be changed in the advanced settings. Set it to 0 to deactivate this function. **When running on the remote as a custom integration the interval will be automatically disabled (set to 0) to reduce battery consumption and save cpu/memory usage.**
 
 #### Health status poller
 
@@ -251,7 +284,7 @@ All health sensor data (light source timer, temperature and error/warning) will 
 
 #### Limitations / Disclaimer
 
-_⚠️ This requires firmware version 1.9.2 or newer (installing firmware versions above 1.7.14 for Remote Two currently need beta updates to be enabled)._
+_⚠️ This requires firmware version 1.9.2 or newer and 2.8.3 to support select entities (installing firmware versions above 1.7.14 for Remote Two currently need beta updates to be enabled)._
 
 ##### Missing firmware features
 
@@ -287,7 +320,7 @@ Alternatively you can also use the unofficial [UC Remote Toolkit](https://github
 
 #### Remote requirements
 
-- Firmware 1.7.12 or newer to support simple commands and remote entities
+- Firmware 2.8.3 or newer to support select entities. Otherwise these entities will be ignored.
 
 #### Bare metal/VM
 
@@ -409,10 +442,6 @@ and under the GitHub [releases](/releases).
 - GTZ models: [https://www.sony.com/electronics/support/res/manuals/9976/42368d260676e4dc154f00932c23e5f0/99769555M.pdf](https://www.sony.com/electronics/support/res/manuals/9976/42368d260676e4dc154f00932c23e5f0/99769555M.pdf)
 
 If your projector is not listed in the supported commands list please contact your authorized Sony dealer to get the full ADCP supported commands list document for your projector model.
-
-## Planned improvements
-
-- Use multicast SDDP (Simple Device Discovery Protocol) for advertisement instead of SDAP which has limitations
 
 ## Credits
 

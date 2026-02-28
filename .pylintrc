@@ -20,11 +20,13 @@ disable=
     too-many-instance-attributes,
     too-many-arguments,
     too-many-public-methods,
+    too-many-lines,
     fixme,
     logging-not-lazy,
     logging-fstring-interpolation,
     broad-exception-raised,
     broad-exception-caught,
+    try-except-raise,
 
 [STRING]
 

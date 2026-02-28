@@ -24,7 +24,7 @@ async def add(device_id: str):
     rt_name = config.Devices.get(device_id=device_id, key="remote-name")
     rt_id = config.Devices.get(device_id=device_id, key="remote-id")
 
-    definition = config.Remote().get_def(ent_id=rt_id, name=rt_name)
+    definition = config.EntityDefinitions.Remote().get_def(ent_id=rt_id, name=rt_name)
 
     driver.api.available_entities.add(definition)
 
@@ -38,7 +38,7 @@ async def remove(device_id: str):
     rt_name = config.Devices.get(device_id=device_id, key="remote-name")
     rt_id = config.Devices.get(device_id=device_id, key="remote-id")
 
-    definition = config.Remote().get_def(ent_id=rt_id, name=rt_name)
+    definition = config.EntityDefinitions.Remote().get_def(ent_id=rt_id, name=rt_name)
 
     driver.api.available_entities.add(definition)
 
@@ -46,24 +46,27 @@ async def remove(device_id: str):
 
 
 
-async def update(device_id: str):
-    """Retrieve input source, power status and muted status from the projector, compare them with the known status on the remote and update them if necessary"""
+async def update_attributes(device_id: str):
+    """Retrieve power status from the projector, compare them with the current entity attributes and update them if necessary"""
 
+    remote_id = config.Devices.get(device_id, "remote-id")
+
+    _LOG.debug(f"Checking power status for remote entity attributes for {device_id}")
     try:
-        power = await projector.get_attr_power(device_id)
+        power = await projector.get_setting(device_id, config.SensorTypes.POWER_STATUS)
     except Exception as e:
         _LOG.error(e)
-        _LOG.warning("Can't get power status from projector. Set to Unavailable")
-        power = {ucapi.remote.Attributes.STATE: ucapi.remote.States.UNAVAILABLE}
+        _LOG.warning(f"Can't get power state from projector. Set state to {ucapi.remote.States.UNKNOWN}")
+        power = ucapi.remote.States.UNKNOWN
 
     try:
-        api_update_attributes = driver.api.configured_entities.update_attributes(device_id, power)
+        api_update_attributes = driver.api.configured_entities.update_attributes(remote_id, {ucapi.remote.Attributes.STATE: power})
         if not api_update_attributes:
-            driver.api.available_entities.update_attributes(device_id, power)
+            driver.api.available_entities.update_attributes(remote_id, power)
     except Exception as e:
-        raise Exception("Error while updating status attribute for entity id " + device_id) from e
+        raise Exception("Error while updating status attribute for entity id " + remote_id) from e
 
-    _LOG.info("Updated remote entity status attribute to " + str(power) + " for " + device_id)
+    _LOG.info("Updated remote entity status attribute to " + str(power) + " for " + remote_id)
 
 
 
@@ -259,36 +262,41 @@ def create_button_mappings() -> list[ucapi.ui.DeviceButtonMapping | dict[str, An
 def create_ui_pages() -> list[ucapi.ui.UiPage | dict[str, Any]]:
     """Create a user interface with different pages that includes all commands"""
 
-    ui_page1 = ucapi.ui.UiPage("page1", "Power, Inputs & HDR", grid=ucapi.ui.Size(6, 7))
-    ui_page1.add(ucapi.ui.create_ui_text("On", 0, 0, size=ucapi.ui.Size(2, 1), cmd=ucapi.remote.Commands.ON))
-    ui_page1.add(ucapi.ui.create_ui_text("Off", 2, 0, size=ucapi.ui.Size(2, 1), cmd=ucapi.remote.Commands.OFF))
+    ui_page1 = ucapi.ui.UiPage("page1", "Power, Inputs & HDR", grid=ucapi.ui.Size(8, 8))
+    ui_page1.add(ucapi.ui.create_ui_text("HDMI 1", 0, 0, size=ucapi.ui.Size(2, 1), cmd=ucapi.remote.create_send_cmd(config.SimpleCommands.INPUT_HDMI1)))
+    ui_page1.add(ucapi.ui.create_ui_text("HDMI 2", 2, 0, size=ucapi.ui.Size(2, 1), cmd=ucapi.remote.create_send_cmd(config.SimpleCommands.INPUT_HDMI2)))
     ui_page1.add(ucapi.ui.create_ui_icon("uc:info", 4, 0, size=ucapi.ui.Size(2, 1), \
                                         cmd=ucapi.remote.create_sequence_cmd([ucapi.media_player.Commands.MENU,ucapi.media_player.Commands.CURSOR_UP])))
-    ui_page1.add(ucapi.ui.create_ui_text("HDMI 1", 0, 1, size=ucapi.ui.Size(3, 1), cmd=ucapi.remote.create_send_cmd(config.SimpleCommands.INPUT_HDMI1)))
-    ui_page1.add(ucapi.ui.create_ui_text("HDMI 2", 3, 1, size=ucapi.ui.Size(3, 1), cmd=ucapi.remote.create_send_cmd(config.SimpleCommands.INPUT_HDMI2)))
-    ui_page1.add(ucapi.ui.create_ui_text("-- HDR --", 0, 2, size=ucapi.ui.Size(6, 1)))
-    ui_page1.add(ucapi.ui.create_ui_text("On", 0, 3, size=ucapi.ui.Size(1, 1), cmd=ucapi.remote.create_send_cmd(config.SimpleCommands.MODE_HDR_ON)))
-    ui_page1.add(ucapi.ui.create_ui_text("Off", 1, 3, size=ucapi.ui.Size(1, 1), cmd=ucapi.remote.create_send_cmd(config.SimpleCommands.MODE_HDR_OFF)))
-    ui_page1.add(ucapi.ui.create_ui_text("Auto", 2, 3, size=ucapi.ui.Size(1, 1), cmd=ucapi.remote.create_send_cmd(config.SimpleCommands.MODE_HDR_AUTO)))
-    ui_page1.add(ucapi.ui.create_ui_text("HDR10", 3, 3, size=ucapi.ui.Size(1, 1), cmd=ucapi.remote.create_send_cmd(config.SimpleCommands.MODE_HDR_HDR10)))
-    ui_page1.add(ucapi.ui.create_ui_text("HDR Ref", 4, 3, size=ucapi.ui.Size(1, 1), cmd=ucapi.remote.create_send_cmd(config.SimpleCommands.MODE_HDR_HDR_REF)))
-    ui_page1.add(ucapi.ui.create_ui_text("HLG", 5, 3, size=ucapi.ui.Size(1, 1), cmd=ucapi.remote.create_send_cmd(config.SimpleCommands.MODE_HDR_HLG)))
-    ui_page1.add(ucapi.ui.create_ui_text("-- HDR Dynamic Tone Mapping --", 0, 4, size=ucapi.ui.Size(6, 1)))
-    ui_page1.add(ucapi.ui.create_ui_text("Off", 1, 5, size=ucapi.ui.Size(1, 1), cmd=ucapi.remote.create_send_cmd(config.SimpleCommands.MODE_HDR_DYN_TONE_MAPPING_OFF)))
-    ui_page1.add(ucapi.ui.create_ui_text("Mode 1", 2, 5, size=ucapi.ui.Size(1, 1), cmd=ucapi.remote.create_send_cmd(config.SimpleCommands.MODE_HDR_DYN_TONE_MAPPING_1)))
-    ui_page1.add(ucapi.ui.create_ui_text("Mode 2", 3, 5, size=ucapi.ui.Size(1, 1), cmd=ucapi.remote.create_send_cmd(config.SimpleCommands.MODE_HDR_DYN_TONE_MAPPING_2)))
-    ui_page1.add(ucapi.ui.create_ui_text("Mode 3", 4, 5, size=ucapi.ui.Size(1, 1), cmd=ucapi.remote.create_send_cmd(config.SimpleCommands.MODE_HDR_DYN_TONE_MAPPING_3)))
+    ui_page1.add(ucapi.ui.create_ui_text("On", 6, 0, size=ucapi.ui.Size(1, 1), cmd=ucapi.remote.Commands.ON))
+    ui_page1.add(ucapi.ui.create_ui_text("Off", 7, 0, size=ucapi.ui.Size(1, 1), cmd=ucapi.remote.Commands.OFF))
+    ui_page1.add(ucapi.ui.create_ui_text("-- HDR --", 0, 1, size=ucapi.ui.Size(8, 1)))
+    ui_page1.add(ucapi.ui.create_ui_text("On", 1, 2, size=ucapi.ui.Size(1, 1), cmd=ucapi.remote.create_send_cmd(config.SimpleCommands.MODE_HDR_ON)))
+    ui_page1.add(ucapi.ui.create_ui_text("Off", 2, 2, size=ucapi.ui.Size(1, 1), cmd=ucapi.remote.create_send_cmd(config.SimpleCommands.MODE_HDR_OFF)))
+    ui_page1.add(ucapi.ui.create_ui_text("Auto", 3, 2, size=ucapi.ui.Size(1, 1), cmd=ucapi.remote.create_send_cmd(config.SimpleCommands.MODE_HDR_AUTO)))
+    ui_page1.add(ucapi.ui.create_ui_text("HDR10", 4, 2, size=ucapi.ui.Size(1, 1), cmd=ucapi.remote.create_send_cmd(config.SimpleCommands.MODE_HDR_HDR10)))
+    ui_page1.add(ucapi.ui.create_ui_text("HDR Ref", 5, 2, size=ucapi.ui.Size(1, 1), cmd=ucapi.remote.create_send_cmd(config.SimpleCommands.MODE_HDR_HDR_REF)))
+    ui_page1.add(ucapi.ui.create_ui_text("HLG", 6, 2, size=ucapi.ui.Size(1, 1), cmd=ucapi.remote.create_send_cmd(config.SimpleCommands.MODE_HDR_HLG)))
+    ui_page1.add(ucapi.ui.create_ui_text("-- HDR Dynamic Tone Mapping --", 0, 3, size=ucapi.ui.Size(8, 1)))
+    ui_page1.add(ucapi.ui.create_ui_text("Off", 2, 4, size=ucapi.ui.Size(1, 1), cmd=ucapi.remote.create_send_cmd(config.SimpleCommands.MODE_HDR_DYNAMIC_TONE_MAPPING_OFF)))
+    ui_page1.add(ucapi.ui.create_ui_text("Mode 1", 3, 4, size=ucapi.ui.Size(1, 1), cmd=ucapi.remote.create_send_cmd(config.SimpleCommands.MODE_HDR_DYNAMIC_TONE_MAPPING_1)))
+    ui_page1.add(ucapi.ui.create_ui_text("Mode 2", 4, 4, size=ucapi.ui.Size(1, 1), cmd=ucapi.remote.create_send_cmd(config.SimpleCommands.MODE_HDR_DYNAMIC_TONE_MAPPING_2)))
+    ui_page1.add(ucapi.ui.create_ui_text("Mode 3", 5, 4, size=ucapi.ui.Size(1, 1), cmd=ucapi.remote.create_send_cmd(config.SimpleCommands.MODE_HDR_DYNAMIC_TONE_MAPPING_3)))
+    ui_page1.add(ucapi.ui.create_ui_text("-- Dynamic Contrast/HDR Enhancer --", 0, 5, size=ucapi.ui.Size(8, 1)))
+    ui_page1.add(ucapi.ui.create_ui_text("Off", 2, 6, size=ucapi.ui.Size(1, 1), cmd=ucapi.remote.create_send_cmd(config.SimpleCommands.MODE_CONTRAST_ENHANCER_OFF)))
+    ui_page1.add(ucapi.ui.create_ui_text("Low", 3, 6, size=ucapi.ui.Size(1, 1), cmd=ucapi.remote.create_send_cmd(config.SimpleCommands.MODE_CONTRAST_ENHANCER_LOW)))
+    ui_page1.add(ucapi.ui.create_ui_text("Mid", 4, 6, size=ucapi.ui.Size(1, 1), cmd=ucapi.remote.create_send_cmd(config.SimpleCommands.MODE_CONTRAST_ENHANCER_MID)))
+    ui_page1.add(ucapi.ui.create_ui_text("High", 5, 6, size=ucapi.ui.Size(1, 1), cmd=ucapi.remote.create_send_cmd(config.SimpleCommands.MODE_CONTRAST_ENHANCER_HIGH)))
 
     ui_page2 = ucapi.ui.UiPage("page2", "Picture Modes", grid=ucapi.ui.Size(6, 6))
     ui_page2.add(ucapi.ui.create_ui_text("-- Picture Modes --", 0, 0, size=ucapi.ui.Size(6, 1)))
     ui_page2.add(ucapi.ui.create_ui_text("Cinema Film 1", 0, 1, size=ucapi.ui.Size(3, 1), cmd=ucapi.remote.create_send_cmd(config.SimpleCommands.MODE_PRESET_CINEMA_FILM_1)))
-    ui_page2.add(ucapi.ui.create_ui_text("Cinema Film 2", 2, 1, size=ucapi.ui.Size(3, 1), cmd=ucapi.remote.create_send_cmd(config.SimpleCommands.MODE_PRESET_CINEMA_FILM_2)))
+    ui_page2.add(ucapi.ui.create_ui_text("Cinema Film 2", 3, 1, size=ucapi.ui.Size(3, 1), cmd=ucapi.remote.create_send_cmd(config.SimpleCommands.MODE_PRESET_CINEMA_FILM_2)))
     ui_page2.add(ucapi.ui.create_ui_text("Reference", 0, 2, size=ucapi.ui.Size(3, 1), cmd=ucapi.remote.create_send_cmd(config.SimpleCommands.MODE_PRESET_REF)))
-    ui_page2.add(ucapi.ui.create_ui_text("Game", 2, 2, size=ucapi.ui.Size(3, 1), cmd=ucapi.remote.create_send_cmd(config.SimpleCommands.MODE_PRESET_GAME)))
+    ui_page2.add(ucapi.ui.create_ui_text("Game", 3, 2, size=ucapi.ui.Size(3, 1), cmd=ucapi.remote.create_send_cmd(config.SimpleCommands.MODE_PRESET_GAME)))
     ui_page2.add(ucapi.ui.create_ui_text("TV", 0, 3, size=ucapi.ui.Size(3, 1), cmd=ucapi.remote.create_send_cmd(config.SimpleCommands.MODE_PRESET_TV)))
-    ui_page2.add(ucapi.ui.create_ui_text("Bright TV", 2, 3, size=ucapi.ui.Size(3, 1), cmd=ucapi.remote.create_send_cmd(config.SimpleCommands.MODE_PRESET_BRIGHT_TV)))
+    ui_page2.add(ucapi.ui.create_ui_text("Bright TV", 3, 3, size=ucapi.ui.Size(3, 1), cmd=ucapi.remote.create_send_cmd(config.SimpleCommands.MODE_PRESET_BRIGHT_TV)))
     ui_page2.add(ucapi.ui.create_ui_text("Bright Cinema", 0, 4, size=ucapi.ui.Size(3, 1), cmd=ucapi.remote.create_send_cmd(config.SimpleCommands.MODE_PRESET_BRIGHT_CINEMA)))
-    ui_page2.add(ucapi.ui.create_ui_text("Photo", 2, 4, size=ucapi.ui.Size(3, 1), cmd=ucapi.remote.create_send_cmd(config.SimpleCommands.MODE_PRESET_PHOTO)))
+    ui_page2.add(ucapi.ui.create_ui_text("Photo", 3, 4, size=ucapi.ui.Size(3, 1), cmd=ucapi.remote.create_send_cmd(config.SimpleCommands.MODE_PRESET_PHOTO)))
     ui_page2.add(ucapi.ui.create_ui_text("User", 0, 5, size=ucapi.ui.Size(3, 1), cmd=ucapi.remote.create_send_cmd(config.SimpleCommands.MODE_PRESET_USER)))
     ui_page2.add(ucapi.ui.create_ui_text("User1", 3, 5, size=ucapi.ui.Size(1, 1), cmd=ucapi.remote.create_send_cmd(config.SimpleCommands.MODE_PRESET_USER1)))
     ui_page2.add(ucapi.ui.create_ui_text("User2", 4, 5, size=ucapi.ui.Size(1, 1), cmd=ucapi.remote.create_send_cmd(config.SimpleCommands.MODE_PRESET_USER2)))
@@ -355,21 +363,25 @@ def create_ui_pages() -> list[ucapi.ui.UiPage | dict[str, Any]]:
     ui_page8.add(ucapi.ui.create_ui_icon("uc:right-arrow-alt", 2, 5, size=ucapi.ui.Size(2, 1), cmd=ucapi.remote.create_send_cmd(config.SimpleCommands.LENS_SHIFT_RIGHT)))
     ui_page8.add(ucapi.ui.create_ui_icon("uc:down-arrow-alt", 1, 6, size=ucapi.ui.Size(2, 1), cmd=ucapi.remote.create_send_cmd(config.SimpleCommands.LENS_SHIFT_DOWN)))
 
-    ui_page9 = ucapi.ui.UiPage("page9", "Lamp Control", grid=ucapi.ui.Size(6, 8))
-    ui_page9.add(ucapi.ui.create_ui_text("-- Lamp Control --", 0, 0, size=ucapi.ui.Size(3, 1)))
-    ui_page9.add(ucapi.ui.create_ui_text("-- Laser Dimming --", 3, 0, size=ucapi.ui.Size(3, 1)))
-    ui_page9.add(ucapi.ui.create_ui_text("High", 0, 1, size=ucapi.ui.Size(3, 1), cmd=ucapi.remote.create_send_cmd(config.SimpleCommands.LAMP_CONTROL_HIGH)))
-    ui_page9.add(ucapi.ui.create_ui_text("Low", 0, 2, size=ucapi.ui.Size(3, 1), cmd=ucapi.remote.create_send_cmd(config.SimpleCommands.LAMP_CONTROL_LOW)))
-    ui_page9.add(ucapi.ui.create_ui_icon("uc:up-arrow", 3, 1, size=ucapi.ui.Size(3, 1), cmd=ucapi.remote.create_send_cmd(config.SimpleCommands.LASER_DIM_UP)))
-    ui_page9.add(ucapi.ui.create_ui_icon("uc:down-arrow", 3, 2, size=ucapi.ui.Size(3, 1), cmd=ucapi.remote.create_send_cmd(config.SimpleCommands.LASER_DIM_DOWN)))
-    ui_page9.add(ucapi.ui.create_ui_text("-- Iris Dynamic Control --", 0, 3, size=ucapi.ui.Size(3, 1)))
-    ui_page9.add(ucapi.ui.create_ui_text("-- Light Source Dynamic Control --", 3, 3, size=ucapi.ui.Size(3, 1)))
-    ui_page9.add(ucapi.ui.create_ui_text("Off", 0, 4, size=ucapi.ui.Size(3, 1), cmd=ucapi.remote.create_send_cmd(config.SimpleCommands.MODE_DYN_IRIS_CONTROL_OFF)))
-    ui_page9.add(ucapi.ui.create_ui_text("Full", 0, 5, size=ucapi.ui.Size(3, 1), cmd=ucapi.remote.create_send_cmd(config.SimpleCommands.MODE_DYN_IRIS_CONTROL_FULL)))
-    ui_page9.add(ucapi.ui.create_ui_text("Limited", 0, 6, size=ucapi.ui.Size(3, 1), cmd=ucapi.remote.create_send_cmd(config.SimpleCommands.MODE_DYN_IRIS_CONTROL_LIMITED)))
-    ui_page9.add(ucapi.ui.create_ui_text("Off", 3, 4, size=ucapi.ui.Size(3, 1), cmd=ucapi.remote.create_send_cmd(config.SimpleCommands.MODE_DYN_LIGHT_CONTROL_OFF)))
-    ui_page9.add(ucapi.ui.create_ui_text("Full", 3, 5, size=ucapi.ui.Size(3, 1), cmd=ucapi.remote.create_send_cmd(config.SimpleCommands.MODE_DYN_LIGHT_CONTROL_FULL)))
-    ui_page9.add(ucapi.ui.create_ui_text("Limited", 3, 6, size=ucapi.ui.Size(3, 1), cmd=ucapi.remote.create_send_cmd(config.SimpleCommands.MODE_DYN_LIGHT_CONTROL_LIMITED)))
+    ui_page9 = ucapi.ui.UiPage("page9", "Light Control", grid=ucapi.ui.Size(6, 8))
+    ui_page9.add(ucapi.ui.create_ui_text("-- Iris Brightness --", 0, 0, size=ucapi.ui.Size(3, 1)))
+    ui_page9.add(ucapi.ui.create_ui_text("-- Laser Brightness --", 3, 0, size=ucapi.ui.Size(3, 1)))
+    ui_page9.add(ucapi.ui.create_ui_icon("uc:up-arrow", 0, 1, size=ucapi.ui.Size(3, 1), cmd=ucapi.remote.create_send_cmd(config.SimpleCommands.IRIS_BRIGHTNESS_UP)))
+    ui_page9.add(ucapi.ui.create_ui_icon("uc:up-arrow", 3, 1, size=ucapi.ui.Size(3, 1), cmd=ucapi.remote.create_send_cmd(config.SimpleCommands.LASER_BRIGHTNESS_UP)))
+    ui_page9.add(ucapi.ui.create_ui_icon("uc:down-arrow", 0, 2, size=ucapi.ui.Size(3, 1), cmd=ucapi.remote.create_send_cmd(config.SimpleCommands.IRIS_BRIGHTNESS_DOWN)))
+    ui_page9.add(ucapi.ui.create_ui_icon("uc:down-arrow", 3, 2, size=ucapi.ui.Size(3, 1), cmd=ucapi.remote.create_send_cmd(config.SimpleCommands.LASER_BRIGHTNESS_DOWN)))
+    ui_page9.add(ucapi.ui.create_ui_text("-- Lamp Control --", 0, 3, size=ucapi.ui.Size(2, 1)))
+    ui_page9.add(ucapi.ui.create_ui_text("-- Iris Dynamic Control --", 2, 3, size=ucapi.ui.Size(2, 1)))
+    ui_page9.add(ucapi.ui.create_ui_text("-- Light Source Dynamic Control --", 4, 3, size=ucapi.ui.Size(2, 1)))
+    ui_page9.add(ucapi.ui.create_ui_text("High", 0, 4, size=ucapi.ui.Size(2, 1), cmd=ucapi.remote.create_send_cmd(config.SimpleCommands.LAMP_CONTROL_HIGH)))
+    ui_page9.add(ucapi.ui.create_ui_text("Off", 2, 4, size=ucapi.ui.Size(2, 1), cmd=ucapi.remote.create_send_cmd(config.SimpleCommands.MODE_DYNAMIC_IRIS_CONTROL_OFF)))
+    ui_page9.add(ucapi.ui.create_ui_text("Off", 4, 4, size=ucapi.ui.Size(2, 1), cmd=ucapi.remote.create_send_cmd(config.SimpleCommands.MODE_DYNAMIC_LIGHT_CONTROL_OFF)))
+    ui_page9.add(ucapi.ui.create_ui_text("Low", 0, 5, size=ucapi.ui.Size(2, 1), cmd=ucapi.remote.create_send_cmd(config.SimpleCommands.LAMP_CONTROL_LOW)))
+    ui_page9.add(ucapi.ui.create_ui_text("Full", 2, 5, size=ucapi.ui.Size(2, 1), cmd=ucapi.remote.create_send_cmd(config.SimpleCommands.MODE_DYNAMIC_IRIS_CONTROL_FULL)))
+    ui_page9.add(ucapi.ui.create_ui_text("Full", 4, 5, size=ucapi.ui.Size(2, 1), cmd=ucapi.remote.create_send_cmd(config.SimpleCommands.MODE_DYNAMIC_LIGHT_CONTROL_FULL)))
+    ui_page9.add(ucapi.ui.create_ui_text("Limited", 2, 6, size=ucapi.ui.Size(2, 1), cmd=ucapi.remote.create_send_cmd(config.SimpleCommands.MODE_DYNAMIC_IRIS_CONTROL_LIMITED)))
+    ui_page9.add(ucapi.ui.create_ui_text("Limited", 4, 6, size=ucapi.ui.Size(2, 1), \
+                                         cmd=ucapi.remote.create_send_cmd(config.SimpleCommands.MODE_DYNAMIC_LIGHT_CONTROL_LIMITED)))
 
     ui_page10 = ucapi.ui.UiPage("page10", "Miscellaneous")
     ui_page10.add(ucapi.ui.create_ui_text("-- Input Lag Reduction --", 0, 0, size=ucapi.ui.Size(4, 1)))

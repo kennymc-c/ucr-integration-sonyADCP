@@ -1,104 +1,102 @@
 #!/usr/bin/env python3
 
-"""This file is used to define selected commands as Enums and a send function for the Sony ADCP protocol"""
+"""This module defines selected adcp protocol command, value, parameter and response classes.
+It includes a adcp send function as well as a function to retrieve the projector metadata like ip and model via the sdap protocol. 
+For a full list of supported commands refer to the external links at README.md/#ADCP-supported-commands-list"""
 
 import logging
-from enum import Enum
+from enum import StrEnum
 
 import socket
 from struct import unpack
 import hashlib
 import asyncio
+import json
 
 
 _LOG = logging.getLogger(__name__)
 
 
-#These are just a fraction of available ADCP commands. For a full list of supported commands refer to the external links at README.md/#ADCP-supported-commands-list
 
-#TODD Add a protocol main class with get method that returns the string with .value added to ENUM
-class Get (str, Enum):
-    """This class is used to define commands that return a query value from the projector"""
+class Commands ():
+    """This class is used to define commands that can be send to the projector"""
 
-    INPUT = "input ?"
-    #Setting sensors
-    POWER = "power_status ?"
-    MUTE = "blank ?"
-    PICTURE_MODE = "picture_mode ?"
-    PICTURE_POSITION = "pic_pos_sel ?"
-    ASPECT = "aspect ?"
-    MOTIONFLOW = "motionflow ?"
-    HDR = "hdr ?"
-    HDR_DYN_TONE_MAPPING = "hdr_tone_mapping ?"
-    MODE_2D_3D = "3d_status ?"
-    MODE_3D_FORMAT = "3d_format ?"
-    DYN_IRIS_CONTROL = "iris_dyn_cont ?"
-    DYN_LIGHT_CONTROL = "light_output_dyn ?"
-    LAMP_CONTROL = "lamp_control ?"
-    INPUT_LAG_REDUCTION = "input_lag_red ?"
-    MENU_POSITION = "menu_pos ?"
-    COLOR_SPACE = "color_space ?"
-    COLOR_TEMPERATURE = "color_temp ?"
-    GAMMA = "gamma_correction ?"
-    #Query value only commands:
-    SIGNAL = "signal ?"
-    COLOR_FORMAT = "color_format_info ?" #Not officially documented. Found out by analyzing the adcp.cgi files from the web interface
-    HDR_FORMAT = "hdr_info ?"  #Not officially documented. Found out by analyzing the adcp.cgi files from the web interface
-    TIMER = "timer ?"
-    TEMPERATURE = "temperature ?"
-    WARNING = "warning ?"
-    ERROR = "error ?"
-    MODEL = "modelname ?"
-    SERIAL = "serialnum ?"
-    MAC = "mac_address ?"
+    class Select (StrEnum):
+        """
+        This class is used to define select commands that can be send to the projector. These commands need to be combined with a value from the Values class
+        """
+        POWER = "power"
+        INPUT = "input"
+        PICTURE_MODE = "picture_mode"
+        PICTURE_POSITION_SELECT = "pic_pos_sel"
+        ASPECT = "aspect"
+        MOTIONFLOW = "motionflow"
+        HDR = "hdr"
+        HDR_DYNAMIC_TONE_MAPPING = "hdr_tone_mapping"
+        CONTRAST_ENHANCER = "contrast_enh" #called dynamic HDR enhancer with HDR signals
+        MODE_2D_3D = "2d3d_sel"
+        MODE_3D_FORMAT = "3d_format"
+        DYNAMIC_IRIS_CONTROL = "iris_dyn_cont"
+        DYNAMIC_LIGHT_CONTROL = "light_output_dyn"
+        LAMP_CONTROL = "lamp_control"
+        INPUT_LAG_REDUCTION = "input_lag_red"
+        MENU_POSITION = "menu_pos"
+        MUTE = "blank"
+        COLOR_SPACE = "color_space"
+        COLOR_TEMPERATURE = "color_temp"
+        GAMMA = "gamma_correction"
 
+    class Numeric (StrEnum):
+        """This class is used to define numeric commands that can be send to the projector.
+        These commands need to be combined with a numeric value and can optionally be combined with the
+        Parameters.RELATIVE parameter to indicate that the value is a relative change instead of an absolute value"""
+        LASER_BRIGHTNESS = "light_output_val" #Range: 0-1000
+        IRIS_BRIGHTNESS = "iris_brightness" #Range Unknown, assumed to be 0-1000 based on the laser brightness command
 
-class Commands (str, Enum):
-    """This class is used to define commands that can be send the projector"""
+    class Execute(StrEnum):
+        """This class is used to define execute commands that can be send to the projector.
+        These commands will be executed immediately and don't need to be combined with a value"""
+        PICTURE_POSITION_SAVE = "pic_pos_save"
+        PICTURE_POSITION_DELETE = "pic_pos_del"
 
-    #Need additional values:
-    POWER_ON = "power \"on\""
-    POWER_OFF = "power \"off\""
-    INPUT = "input"
-    PICTURE_MODE = "picture_mode"
-    PICTURE_POSITION_SELECT = "pic_pos_sel"
-    PICTURE_POSITION_SAVE = "pic_pos_save"
-    PICTURE_POSITION_DELETE = "pic_pos_del"
-    ASPECT = "aspect"
-    MOTIONFLOW = "motionflow"
-    HDR = "hdr"
-    HDR_DYN_TONE_MAPPING = "hdr_tone_mapping"
-    MODE_2D_3D = "2d3d_sel"
-    MODE_3D_FORMAT = "3d_format"
-    DYN_IRIS_CONTROL = "iris_dyn_cont"
-    DYN_LIGHT_CONTROL = "light_output_dyn"
-    LAMP_CONTROL = "lamp_control"
-    INPUT_LAG = "input_lag_red"
-    MENU_POSITION = "menu_pos"
-    MUTE = "blank"
-    #Keys that are working without values:
-    POWER_TOGGLE = "key \"power\""
-    MENU = "key \"menu\""
-    UP = "key \"up\""
-    DOWN = "key \"down\""
-    LEFT = "key \"left\""
-    RIGHT = "key \"right\""
-    ENTER = "key \"enter\""
-    LENS_FOCUS_NEAR = "key \"lens_focus_near\""
-    LENS_FOCUS_FAR = "key \"lens_focus_far\""
-    LENS_ZOOM_LARGE = "key \"lens_zoom_up\""
-    LENS_ZOOM_SMALL = "key \"lens_zoom_down\""
-    LENS_SHIFT_UP = "key \"lens_shift_up\""
-    LENS_SHIFT_DOWN = "key \"lens_shift_down\""
-    LENS_SHIFT_LEFT = "key \"lens_shift_left\""
-    LENS_SHIFT_RIGHT = "key \"lens_shift_right\""
-    LASER_DIM_UP = "key \"laser_brightness+\""
-    LASER_DIM_DOWN = "key \"laser_brightness-\""
+    class Key (StrEnum):
+        """This class is used to define key commands that can be send to the projector. These commands can't be combined with a value"""
+        POWER_TOGGLE = "key \"power\""
+        MENU = "key \"menu\""
+        UP = "key \"up\""
+        DOWN = "key \"down\""
+        LEFT = "key \"left\""
+        RIGHT = "key \"right\""
+        ENTER = "key \"enter\""
+        LENS_FOCUS_NEAR = "key \"lens_focus_near\""
+        LENS_FOCUS_FAR = "key \"lens_focus_far\""
+        LENS_ZOOM_LARGE = "key \"lens_zoom_up\""
+        LENS_ZOOM_SMALL = "key \"lens_zoom_down\""
+        LENS_SHIFT_UP = "key \"lens_shift_up\""
+        LENS_SHIFT_DOWN = "key \"lens_shift_down\""
+        LENS_SHIFT_LEFT = "key \"lens_shift_left\""
+        LENS_SHIFT_RIGHT = "key \"lens_shift_right\""
+
+    class Query (StrEnum):
+        """This class is used to define query-only commands. Have to be used with Parameters.QUERY parameter"""
+
+        POWER_STATUS = "power_status"
+        SIGNAL = "signal"
+        MODE_2D_3D = "3d_status"
+        COLOR_FORMAT = "color_format_info" #Not officially documented. Found out by analyzing the adcp.cgi files from the web interface
+        HDR_FORMAT = "hdr_info"  #Not officially documented. Found out by analyzing the adcp.cgi files from the web interface
+        TIMER = "timer"
+        TEMPERATURE = "temperature"
+        WARNING = "warning"
+        ERROR = "error"
+        MODEL = "modelname"
+        SERIAL = "serialnum"
+        MAC = "mac_address"
 
 class Values():
-    """Includes all classes with values that can be combined with commands"""
+    """Includes all classes with values that can be combined with commands and will be returned by query commands"""
 
-    class States (str, Enum):
+    class States (StrEnum):
         """This class is used to define states that can be used in conjunction with certain commands"""
 
         ON = "\"on\""
@@ -108,13 +106,13 @@ class Values():
         COOLING1 = "\"cooling1\""
         COOLING2 = "\"cooling2\""
 
-    class Inputs (str, Enum):
+    class Inputs (StrEnum):
         """This class is used to define the input sources that can be used with the input command"""
 
         HDMI1 = "\"hdmi1\""
         HDMI2 = "\"hdmi2\""
 
-    class PictureModes (str, Enum):
+    class PictureModes (StrEnum):
         """This class is used to define the picture modes that can be used with the picture_mode command"""
 
         CINEMA_FILM1 = "\"cinema_film1\""
@@ -130,7 +128,7 @@ class Values():
         USER3 = "\"user3\""
         GAME = "\"game\""
 
-    class PicturePositions (str, Enum):
+    class PicturePositions (StrEnum):
         """This class is used to define the picture positions that can be used with the picture_position_select command"""
 
         PP_1_85 = "\"1.85_1\""
@@ -141,7 +139,7 @@ class Values():
         CUSTOM4 = "\"custom4\""
         CUSTOM5 = "\"custom5\""
 
-    class PicturePositionsManage (str, Enum):
+    class PicturePositionsManage (StrEnum):
         """This class is used to define the picture positions that can be used with the picture_position_save and delete command"""
 
         PP_1_85 = "--1.85_1"
@@ -152,7 +150,7 @@ class Values():
         CUSTOM4 = "--custom4"
         CUSTOM5 = "--custom5"
 
-    class Aspect (str, Enum):
+    class Aspect (StrEnum):
         """This class is used to define the aspect ratios that can be used with the aspect command"""
 
         FULL1 = "\"full1\""
@@ -164,7 +162,7 @@ class Values():
         ZOOM_1_85 = "\"1.85_1_zoom\""
         ZOOM_2_35 = "\"2.35_1_zoom\""
 
-    class Motionflow(str, Enum):
+    class Motionflow(StrEnum):
         """This class is used to define the motionflow modes that can be used with the motionflow command"""
 
         SMOOTH_HIGH = "\"smooth_high\""
@@ -174,7 +172,7 @@ class Values():
         TRUE_CINEMA = "\"true_cinema\""
         OFF = "\"off\""
 
-    class HDR(str, Enum):
+    class HDR(StrEnum):
         """HDR settings available on the projector"""
         ON = "\"on\""
         OFF = "\"off\""
@@ -183,44 +181,51 @@ class Values():
         HDR10 = "\"hdr10\""
         HDR_REF = "\"hdr_reference\""
 
-    class HDRDynToneMapping(str, Enum):
+    class HDRDynToneMapping(StrEnum):
         """HDR dynamic tone mapping settings available on the projector"""
         MODE_1 = "\"mode1\""
         MODE_2 = "\"mode2\""
         MODE_3 = "\"mode3\""
         OFF = "\"off\""
 
-    class LampControl(str, Enum):
+    class LampControl(StrEnum):
         """Lamp control settings available on the projector"""
         LOW = "\"low\""
         HIGH = "\"high\""
 
-    class LightControl(str, Enum):
+    class LightControl(StrEnum):
         """Iris / light source dynamic control settings available on the projector"""
         OFF = "\"off\""
         FULL = "\"full\""
         LIMITED = "\"limited\""
 
-    class Mode2D3D(str, Enum):
+    class Mode2D3D(StrEnum):
         """2D/3D mode settings available on the projector"""
         MODE_AUTO = "\"auto\""
         MODE_3D = "\"3d\""
         MODE_2D = "\"2d\""
 
-    class Mode3DFormat(str, Enum):
+    class Mode3DFormat(StrEnum):
         """3D format settings available on the projector"""
         SIMULATED = "\"simulated\""
         SIDE_BY_SIDE = "\"sidebyside\""
         OVER_UNDER = "\"overunder\""
 
-    class MenuPosition(str, Enum):
+    class MenuPosition(StrEnum):
         """Menu position settings available on the projector"""
         BOTTOM_LEFT = "\"bottom_left\""
         CENTER = "\"center\""
 
+    class ContrastEnhancer(StrEnum):
+        """This class is used to define the contrast / dynamic HDR enhancer values that can be used with the contrast_enh command"""
+        OFF = "\"off\""
+        LOW = "\"low\""
+        MID = "\"mid\""
+        HIGH = "\"high\""
+
     #Not yet uses as simple commands
-    class ColorSpaces (str, Enum):
-        """This class is used to define the color spaces that can be used with the color_space  command"""
+    class ColorSpaces (StrEnum):
+        """This class is used to define the color spaces that can be used with the color_space command"""
 
         BT709 = "\"bt709\""
         BT2020 = "\"bt2020\""
@@ -234,7 +239,7 @@ class Values():
         DCI = "\"dci\""
 
     #Not yet uses as simple commands
-    class ColorTemps (str, Enum):
+    class ColorTemps (StrEnum):
         """This class is used to define the color temps that can be used with the color_temp command"""
         CUSTOM1 = "\"custom1\""
         CUSTOM2 = "\"custom2\""
@@ -248,7 +253,7 @@ class Values():
         DCI = "\"dci\""
 
     #Not yet uses as simple commands
-    class GammaValues (str, Enum):
+    class GammaValues (StrEnum):
         """This class is used to define the gamma values that can be used with the gamma_correction command"""
         GAMMA_1_8 = "\"1.8\""
         GAMMA_2_0 = "\"2.0\""
@@ -262,10 +267,42 @@ class Values():
         GAMMA_10 = "\"gamma10\""
         OFF = "\"off\""
 
-class Responses():
-    """Includes all classes with responses that can be returned by response only get commands"""
+class Parameters (StrEnum):
+    """Includes all classes with parameters that can be used with commands"""
 
-    class Errors (str, Enum):
+    QUERY = "?"
+    RANGE = "? --range"
+    INFO = "--info"
+    RELATIVE = "--rel" #only for numeric values
+    RESET = "--reset"
+
+class Responses():
+    """Includes all classes with responses that can be returned by query commands"""
+
+    class Protocol (StrEnum):
+        """This class is used to define adcp protocol responses that can be returned by the projector"""
+        OK = "ok"
+        ERROR_AUTH = "err_auth"
+        ERROR_CMD = "err_cmd"
+        ERROR_VAL = "err_val"
+        ERROR_OPTION = "err_option"
+        ERROR_INACTIVE = "err_inactive"
+        ERROR_INTERNAL1 = "err_internal1"
+        ERROR_INTERNAL2 = "err_internal2"
+
+    class States (StrEnum):
+        """This class is used to define states that can be returned in conjunction with certain commands"""
+
+        ON = "\"on\""
+        OFF = "\"off\""
+        OK = "ok" #Not in quotes
+        STANDBY = "\"standby\""
+        STARTUP = "\"startup\""
+        COOLING1 = "\"cooling1\""
+        COOLING2 = "\"cooling2\""
+        INVALID = "\"Invalid\"" # Possible response from signal ?, no separate class for other signal values as there are too many of them and query only anyway
+
+    class Errors (StrEnum):
         """This class is used to define errors that will be returned with the error ? get command. Multiple values can be returned in a json array"""
         NO = "\"no_err\""
         POWER = "\"err_power\"" #Main power supply error
@@ -286,7 +323,7 @@ class Responses():
         ASSY = "\"err_assy\""
         BALLAST = "\"err_ballast_update\""
 
-    class Warning (str, Enum):
+    class Warning (StrEnum):
         """This class is used to define warnings that will be returned with the warning ? get command. Multiple values can be returned in a json array"""
         NO = "\"no_warn\""
         LIGHT_SRC_LIFE = "\"warn_light_src_life\""
@@ -299,8 +336,6 @@ class Responses():
 
 class Projector:
     """This class is used to define the projector object and its methods"""
-
-
 
     def __init__(self, ip: str = None, sdap_port: int = 53862, adcp_port: int = 53595, adcp_timeout: int = 5, adcp_password: str = "Projector"):
         """
@@ -404,15 +439,21 @@ class Projector:
 
 
 
-    async def command(self, command):
+    async def command(self, command: str|dict, parameter: str = None):
         """Send an ADCP command to the projector and return the response using async socket connection"""
 
         #Needed as get_pjinfo works without an ip
         if self.ip is None:
             raise ValueError("No ip address has been ")
 
-        if isinstance(command, Enum):
-            command = command.value
+        # if isinstance(command, Enum):
+        #     command = command.value
+
+        if isinstance(command, dict):
+            command = f"{command['command']} {command['value']}"
+
+        if parameter is not None:
+            command = f"{command} {parameter}"
 
         try:
             async with asyncio.timeout(self.adcp_timeout):
@@ -434,7 +475,7 @@ class Projector:
 
                     if "OK" in auth_reply:
                         authenticated = True
-                    elif "err_auth" in auth_reply:
+                    elif Responses.Protocol.ERROR_AUTH in auth_reply:
                         raise PermissionError("ADCP authentication error. Please check the configured ADCP password")
                     else:
                         raise PermissionError(f"Unexpected ADCP authentication response: {auth_reply}")
@@ -443,7 +484,16 @@ class Projector:
                     writer.write(f"{command}\r\n".encode("ASCII"))
                     await writer.drain()
 
-                    _LOG.debug(f"Sent ADCP command: {command}")
+                    if command.endswith(Parameters.QUERY):
+                        _LOG.debug(f"Sent ADCP query command: {command}")
+                    elif command.endswith(Parameters.RANGE):
+                        _LOG.debug(f"Sent ADCP range query command: {command}")
+                    elif command.endswith(Parameters.RELATIVE):
+                        _LOG.debug(f"Sent ADCP relative numeric command: {command}")
+                    elif command.endswith("\""):
+                        _LOG.debug(f"Sent ADCP select command: {command}")
+                    else:
+                        _LOG.debug(f"Sent ADCP command: {command}")
 
                     response = (await reader.readline()).decode("ASCII").strip()
 
@@ -451,23 +501,27 @@ class Projector:
                     await writer.wait_closed()
 
                     if response:
-                        if "err_cmd" in response:
+                        if Responses.Protocol.ERROR_CMD in response:
                             raise NameError(f"Format error: ADCP command \"{command}\" can not be recognized or is not supported on this model")
-                        if "err_val" in response:
-                            raise ValueError(f"Value error: ADCP command \"{command}\". Value is out of range or invalid")
-                        if "err_option" in response:
-                            raise AttributeError(f"Option error: ADCP command \"{command}\" not supported, invalid or missing")
-                        if "err_inactive" in response:
+                        if Responses.Protocol.ERROR_VAL in response:
+                            raise ValueError(f"Value error: Value from ADCP command \"{command}\" is out of range or invalid")
+                        if Responses.Protocol.ERROR_OPTION in response:
+                            raise AttributeError(f"Option error: ADCP command \"{command}\" is not supported, invalid or missing")
+                        if Responses.Protocol.ERROR_INACTIVE in response:
                             raise OSError(f"ADCP command \"{command}\" temporarily unavailable")
-                        if "err_internal1" in response or "err_internal2" in response:
+                        if response in (Responses.Protocol.ERROR_INTERNAL1, Responses.Protocol.ERROR_INTERNAL2):
                             raise Exception(f"Internal ADCP communication error while sending command \"{command}\"")
                         if (response.startswith('"') or response.startswith("[")) and (response.endswith('"') or response.endswith("]")):
+                            if command.endswith(Parameters.RANGE):
+                                _LOG.debug(f"Received ADCP query command range response: {response}")
+                                options_list = json.loads(response)
+                                return options_list
                             _LOG.debug(f"Received ADCP query value response: {response}")
                             return response
-                        if command.endswith("?"):
+                        if command.endswith(Parameters.QUERY):
                             _LOG.debug(f"Received ADCP query numeric value response: {response}")
                             return response
-                        if response == "ok":
+                        if response == Responses.Protocol.OK:
                             return True
                         raise Exception(f"Received an unknown ADCP response for command \"{command}\": {response}")
                     raise Exception(f"Received no ADCP response for command \"{command}\"")
@@ -490,7 +544,7 @@ Please check if port {self.adcp_port} is the correct port and if the projector i
             _LOG.error(f"Authentication error while sending ADCP command \"{command}\": {perm_error}")
             raise PermissionError from perm_error
         except OSError as os_error:
-            _LOG.warning(os_error)
+            _LOG.info(os_error)
             raise OSError from os_error
         except NameError as name_error:
             _LOG.error(name_error)
