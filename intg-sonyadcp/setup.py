@@ -353,7 +353,8 @@ async def show_setup_advanced():
     mp_poller_interval = mp_poller_interval if mp_poller_interval is not None else config.Setup.get(config.Setup.Keys.DEFAULT_POLLER_INTERVAL_MEDIA_PLAYER)
     health_poller_interval = health_poller_interval if health_poller_interval is not None else config.Setup.get(config.Setup.Keys.DEFAULT_POLLER_INTERVAL_HEALTH)
 
-    picture_positions_mapping = json.loads(picture_positions_mapping)
+    if isinstance(picture_positions_mapping, str):
+        picture_positions_mapping = json.loads(picture_positions_mapping)
 
     return ucapi.RequestUserInput(
         {
@@ -528,10 +529,9 @@ async def handle_response_advanced(msg: ucapi.UserDataResponse) -> ucapi.SetupAc
         msg.input_values["picture_positions_mapping_4"], \
         msg.input_values["picture_positions_mapping_5"]]
 
-    if not all(v == "" for v in picture_positions_names):
-        for picture_preset_name in picture_positions_names:
-            if picture_preset_name != "":
-                picture_positions_mapping.update({f"custom{picture_positions_names.index(picture_preset_name)+1}": picture_preset_name})
+    for i, picture_preset_name in enumerate(picture_positions_names):
+        if picture_preset_name != "":
+            picture_positions_mapping[f"custom{i+1}"] = picture_preset_name
 
     skip_entities = False
 
