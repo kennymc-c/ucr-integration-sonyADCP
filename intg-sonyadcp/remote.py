@@ -111,6 +111,13 @@ async def cmd_handler(
         if repeat != 1:
             _LOG.warning("Execution of the command " + command + " failed. Remaining " + str(repeat-1) + " repetitions will no longer be executed")
 
+    async def update_cmd_attributes(device_id: str, cmd_id: str):
+        try:
+            await projector.update_attributes(device_id, cmd_id)
+        except Exception as e:
+            #No exception as this is not a critical error. The command itself was sent successfully. Not all query commands are supported by all projector models
+            _LOG.error(f"Failed to update entity attributes for device {device_id} after command {cmd_id}: {e}")
+
     match cmd_id:
 
         case \
@@ -132,6 +139,9 @@ async def cmd_handler(
                 if error is not None:
                     _LOG.error(f"Failed to send command {cmd_id}: {error}")
                 return ucapi.StatusCodes.BAD_REQUEST
+
+            #Update attributes in async task to not interfere with command timeout
+            driver.asyncio.create_task(update_cmd_attributes(device_id, cmd_id))
             return ucapi.StatusCodes.OK
 
         case \
@@ -175,6 +185,9 @@ async def cmd_handler(
                 if error:
                     _LOG.error(f"Failed to send command {command}: {error}")
                 return ucapi.StatusCodes.BAD_REQUEST
+
+            #Update attributes in async task to not interfere with command timeout
+            driver.asyncio.create_task(update_cmd_attributes(device_id, cmd_id))
 
             return ucapi.StatusCodes.OK
 
@@ -221,6 +234,9 @@ async def cmd_handler(
                     if error:
                         _LOG.error(f"Failed to send command {command}: {error}")
                     return ucapi.StatusCodes.BAD_REQUEST
+
+            #Update attributes in anync task to not interfere with command timeout
+            driver.asyncio.create_task(update_cmd_attributes(device_id, cmd_id))
 
             return ucapi.StatusCodes.OK
 
@@ -310,6 +326,7 @@ def create_ui_pages() -> list[ucapi.ui.UiPage | dict[str, Any]]:
     ui_page3.add(ucapi.ui.create_ui_text("V Stretch", 2, 2, size=ucapi.ui.Size(2, 1), cmd=ucapi.remote.create_send_cmd(config.SimpleCommands.MODE_ASPECT_RATIO_V_STRETCH)))
     ui_page3.add(ucapi.ui.create_ui_text("Zoom 1:85", 0, 3, size=ucapi.ui.Size(2, 1), cmd=ucapi.remote.create_send_cmd(config.SimpleCommands.MODE_ASPECT_RATIO_ZOOM_1_85)))
     ui_page3.add(ucapi.ui.create_ui_text("Zoom 2:35", 2, 3, size=ucapi.ui.Size(2, 1), cmd=ucapi.remote.create_send_cmd(config.SimpleCommands.MODE_ASPECT_RATIO_ZOOM_2_35)))
+    ui_page3.add(ucapi.ui.create_ui_text("Aspect Ratio Scaling", 1, 4, size=ucapi.ui.Size(2, 1), cmd=ucapi.remote.create_send_cmd(config.SimpleCommands.MODE_ASPECT_RATIO_ASPECT_RATIO_SCALING)))
 
     ui_page4 = ucapi.ui.UiPage("page4", "Picture Positions Select")
     ui_page4.add(ucapi.ui.create_ui_text("-- Picture Positions Select --", 0, 0, size=ucapi.ui.Size(4, 1)))

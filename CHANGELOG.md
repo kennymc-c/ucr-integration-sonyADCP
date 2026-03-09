@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.1] - 2026-03-09
+
+### Added
+
+- Added an advanced setup option to define display names for all 5 custom picture positions presets
+- Added `MODE_AR_RATIO_SCALE` aspect ratio scaling simple command. This command only works on some models
+
+### Fixed
+
+- Fixed random sensor and/or select entities shown suddenly as unavailable after a restart
+- Fixed an issue where a command times out due to a adcp timeout while updating entity attributes after the actual command has been successfully send ([#4](https://github.com/kennymc-c/ucr-integration-sonyADCP/issues/4))
+
+### Changed
+
+- The media player entity is now using the standby state if the projector reports it which is usually when it gets powered off
+  - The remote entity is still using on and off as states as these entity types don't support the standby state
+- Moved ip address format validation from internal logic to integration api regex validation
+- When sending raw ADCP commands through the remote entity all quotes are now automatically converted to correct straight double quotes (") that are accepted by the adcp protocol
+
 ## [1.5.0] - 2026-02-28
 
 ### ⚠️ Known issue
@@ -13,6 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### ⚠️ Breaking
 
+- This update requires firmware 2.8.3 or newer. Otherwise a timeout occures when opening the available entities list. This issue will be fixed with the next ucapi library update
 - Removed video signal infos from media player playback attributes as sensors can be added as widgets to activities since firmware 2.7.2. Please use the video sensor instead
 - If you are running the integration externally (e.g. Docker) you need to delete config.json and run the setup again
   - Don't panic: No entity ids have been changed!

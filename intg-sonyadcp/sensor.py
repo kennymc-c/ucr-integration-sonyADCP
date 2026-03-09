@@ -43,7 +43,8 @@ async def add(device_id: str, sensor_type: str):
 
         elif sensor_type in (config.SensorTypes.POWER_STATUS, config.SensorTypes.PICTURE_MUTING, config.SensorTypes.INPUT_LAG_REDUCTION):
             sensor_device_class = ucapi.sensor.DeviceClasses.BINARY
-            #TODO #WAIT Uncomment when binary sensor device classes are implemeneted
+            sensor_attributes.update({ucapi.sensor.Attributes.VALUE: "off"}) #An empty value will otherwise be interpreted as on
+            #TODO #WAIT Uncomment when binary sensor device classes are implemented and replace string with ucapi literal
             #(https://github.com/unfoldedcircle/core-api/blob/main/doc/entities/entity_sensor.md#binary-device-class)
             #Set binary sensor device class based on Home Assistant (https://www.home-assistant.io/integrations/binary_sensor/#device-class)
             # if sensor_type == config.SensorTypes.POWER_STATUS:
@@ -188,7 +189,8 @@ async def health_poller(device_id: str, interval:int) -> None:
                 _LOG.debug("Skip updating health sensors. Projector is powered off")
                 continue
         except Exception as e:
-            #TODO Implement check if there are too many timeouts/connection errors to the projector and automatically deactivate poller and set entity status to unknown
+            #TODO Implement check if there are too many timeouts/connection errors to the projector and \
+            # automatically stop and disable poller and set entity state attribute to unknown
             _LOG.error(e)
             continue
         try:
@@ -223,7 +225,7 @@ async def update_system(device_id: str):
         _LOG.debug(e)
         current_value = config.Messages.ERROR
 
-    current_value_prettified = config.convert_options(current_value)
+    current_value_prettified = config.convert_options(current_value, device_id)
 
     try:
         stored_states = await driver.api.available_entities.get_states()
@@ -328,8 +330,8 @@ async def update_video(device_id: str):
                 state = ucapi.sensor.States.ON
 
             video_info = \
-                f"{config.convert_options(resolution).lower()} / {config.convert_options(dyn_range)} / \
-                {config.convert_options(color_space)} / {config.convert_options(color_format)} / {config.convert_options(mode_2d_3d)}"
+                f"{config.convert_options(resolution, device_id).lower()} / {config.convert_options(dyn_range, device_id)} / \
+                {config.convert_options(color_space, device_id)} / {config.convert_options(color_format, device_id)} / {config.convert_options(mode_2d_3d, device_id)}"
 
     attributes_to_send = {ucapi.sensor.Attributes.STATE: state, ucapi.sensor.Attributes.VALUE: video_info}
 
@@ -357,11 +359,16 @@ async def update_setting(device_id: str, setting: str):
                 setting = config.SensorTypes.POWER_STATUS
             if setting == config.SelectTypes.HDR_FORMAT:
                 setting = config.SensorTypes.HDR_STATUS
+            if setting == config.SelectTypes.PICTURE_POSITION_SAVE:
+                setting = config.SensorTypes.PICTURE_POSITION_SELECT
         else:
             raise Exception(f"{setting} is not a valid sensor or select type")
 
     sensor_id = config.Devices.get(device_id=device_id, key="sensor-"+setting+"-id")
     current_value = ""
+
+    if not sensor_id:
+        raise ValueError(f"No sensor entity found for setting \"{setting}\"")
 
     _LOG.info(f"Updating {setting} setting for {sensor_id}")
 
@@ -393,7 +400,7 @@ Either because the projector is powered off or the current signal doesn't suppor
         state = ucapi.sensor.States.ON
 
     if setting not in (config.SensorTypes.POWER_STATUS, config.SensorTypes.PICTURE_MUTING, config.SensorTypes.INPUT_LAG_REDUCTION):
-        current_value_prettified = config.convert_options(current_value)
+        current_value_prettified = config.convert_options(current_value, device_id)
     else:
         current_value_prettified = current_value
 

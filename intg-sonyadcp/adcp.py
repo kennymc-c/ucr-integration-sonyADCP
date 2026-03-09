@@ -161,6 +161,7 @@ class Values():
         SQUEEZE = "\"squeeze\""
         ZOOM_1_85 = "\"1.85_1_zoom\""
         ZOOM_2_35 = "\"2.35_1_zoom\""
+        ASPECT_RATIO_SCALING = "\"aspect_ratio_scaling\""
 
     class Motionflow(StrEnum):
         """This class is used to define the motionflow modes that can be used with the motionflow command"""

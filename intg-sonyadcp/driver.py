@@ -198,11 +198,13 @@ async def on_subscribe_entities(entity_ids: list[str]) -> None:
                             sensor_id = config.Devices.get(device_id=device_id, key=f"sensor-{sensor_type}-id")
                             if sensor_id in entity_ids:
                                 await sensor.update_setting(device_id, sensor_type)
+                                await asyncio.sleep(0.3) #WORKAROUND for random unavailable entities
 
                     for select_type in config.SelectTypes.get_all():
                         select_id = config.Devices.get(device_id=device_id, key=f"select-{select_type}-id")
                         if select_id in entity_ids:
                             await selects.update_attributes(device_id, select_type)
+                            await asyncio.sleep(0.3) #WORKAROUND for random unavailable entities
 
             except OSError as e:
                 _LOG.critical(e)
@@ -346,10 +348,6 @@ async def main():
         _LOG.info("The pollers can still be enabled afterwards if a custom interval has been set in the manual advanced setup")
         config.Setup.set(config.Setup.Keys.DEFAULT_POLLER_INTERVAL_MEDIA_PLAYER, 0, False) #Using False to prevent the config file from being created before first time setup
 
-    _LOG.debug("Starting driver initialization")
-
-    await setup.init()
-
     try:
         config.Setup.load()
         config.Devices.load()
@@ -360,6 +358,10 @@ async def main():
 
     if config.Setup.get(config.Setup.Keys.SETUP_COMPLETE):
         await add_available_entities()
+
+    _LOG.debug("Starting driver initialization")
+
+    await setup.init()
 
 
 if __name__ == "__main__":

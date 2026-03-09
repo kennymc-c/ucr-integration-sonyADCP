@@ -99,69 +99,67 @@ Please note that when running this integration on the remote the power/mute/inpu
   - Support for repeat, delay and hold
     - Hold just repeats the command continuously for the given hold time. There is no native hold function for the ADCP protocol as with some ir devices to activate additional functions
 - Sensors
-  - Health
-    - All health sensors will be updated every time the projector is powered on or off by the remote and automatically every 30 minutes (can be changed in the advanced setup) while the projector is powered on and the remote is not in sleep/standby mode or the integration is disconnected
-    - Health sensors:
-      - Light source timer
-      - Temperature
-        - The sensor will only be added as available entity if your model can provide temperature data
-      - System status (error and warning messages from the projector)
+  - Power Status
+  - Input
+  - Picture Muting
+  - Picture Preset
+  - Picture Position Select
+  - Aspect
+  - HDR Status
+  - HDR Dynamic Tone Mapping
+  - Dynamic Contrast / HDR Enhancer
+  - Lamp Control
+  - Dynamic Iris Control
+  - Dynamic Light Control
+  - Laser Brightness
+  - Iris Brightness
+  - Motionflow
+  - 2D/3D Mode
+  - 3D Format
+  - Input Lag Reduction
+  - Menu Position
+  - Color Temperature
+  - Color Space
+  - Gamma
+  - Light source timer
+  - Temperature
+  - System status
+    - Shows error and warning messages from the projector
   - Video signal
     - Shows the current resolution, framerate, dynamic range format, color space, color format and 2D/3D status
-    - Video signal data is automatically updated when the projector or video muting is turned on or off and when the input is changed
-      - Use the `UPDATE_VIDEO_INFO` simple command to update the sensor manually
-  - Setting sensors
-    - Each sensor will be updated every time a corresponding command is triggered
-    - All sensors will be updated when the projector is powered on or off or when a send command/send command sequence command from the remote entity has been received
-      - Use the `UPDATE_SETTING_SENS` simple command to update the sensor manually
-    - The following sensors are available if the setting is supported by your model:
-      - Power Status
-      - Input
-      - Picture Muting
-      - Picture Preset
-      - Picture Position
-      - Aspect
-      - HDR Status
-      - HDR Dynamic Tone Mapping
-      - Dynamic Contrast / HDR Enhancer
-      - Lamp Control
-      - Dynamic Iris Control
-      - Dynamic Light Control
-      - Laser Brightness
-      - Iris Brightness
-      - Motionflow
-      - 2D/3D Mode
-      - 3D Format
-      - Input Lag Reduction
-      - Menu Position
-      - Color Temperature
-      - Color Space
-      - Gamma
-    - Sensors for laser dimming and lens control are not included as their current values can't be polled through ADCP
-  - Select
-    - Available and current options will be updated when the projector is powered on or off, the input is changed or muted or when a send command/send command sequence command from the remote entity has been received
-    - All select entities will be updated when the projector is powered on or off or when a send command/send command sequence command from the remote entity has been received
-      - Use the `UPDATE_SELECT_OPTION` simple command to update the sensor manually
-    - The following select entities are available if the setting is supported by your model:
-      - Power
-      - Input
-      - Picture Muting
-      - Picture Preset
-      - Aspect
-      - Picture Position Select & Save
-      - HDR Format
-      - HDR Dynamic Tone Mapping
-      - Lamp Control
-      - Dynamic Iris Control
-      - Dynamic Light Control
-      - Dynamic Contrast/HDR Enhancer
-      - Motionflow
-      - 3D Format
-      - Input Lag Reduction
-      - Menu Position
-      - Color Temperature
-      - Color Space
-      - Gamma
+    - Video signal data is automatically updated when the projector is powered on or off, video muting is turned on or off and when the input is changed
+      - Use the `UPDATE_VIDEO_INFO` simple command to update the video signal sensor manually
+  - Some sensors are only available if the setting is supported by your model
+  - Each sensor will be updated every time a corresponding command is triggered
+  - All sensors will be updated when the projector is powered on or off or when a send command/send command sequence command from the remote entity has been received
+    - Use the `UPDATE_ALL_SENSORS` simple command to update all sensors manually
+  - All health sensors (light, temperature, system status) will be updated every time the projector is powered on or off by the remote and automatically every 30 minutes (can be changed in the advanced setup) while the projector is powered on and the remote is not in sleep/standby mode or the integration is disconnected
+    - Use the `UPDATE_HEALTH_STATUS` simple command to update all health sensors manually
+  - Sensors for laser dimming and lens control are not included as their current values can't be polled through ADCP
+- Select
+  - Power
+  - Input
+  - Picture Muting
+  - Picture Preset
+  - Aspect
+  - Picture Position Select & Save
+  - HDR Format
+  - HDR Dynamic Tone Mapping
+  - Lamp Control
+  - Dynamic Iris Control
+  - Dynamic Light Control
+  - Dynamic Contrast/HDR Enhancer
+  - Motionflow
+  - 3D Format
+  - Input Lag Reduction
+  - Menu Position
+  - Color Temperature
+  - Color Space
+  - Gamma
+  - Some select entities are only available if the setting is supported by your model
+  - Available and current options will be updated when the projector is powered on or off, the input is changed or muted or when a send command/send command sequence command from the remote entity has been received
+  - All select entities will be updated when the projector is powered on or off or when a send command/send command sequence command from the remote entity has been received
+    - Use the `UPDATE_SELECT_OPTION` simple command to update the sensor manually
 
 ## Commands & attributes
 
@@ -179,7 +177,7 @@ Please note that when running this integration on the remote the power/mute/inpu
 
 ### Supported media player attributes
 
-- Power Status (On, Off, Unknown)
+- Power Status (Standby, On, Off, Unknown)
 - Muted (True, False)
 - Source
 - Source List (HDMI 1, HDMI 2)
@@ -187,11 +185,11 @@ Please note that when running this integration on the remote the power/mute/inpu
 ### Supported simple commands (media player & remote entity)
 
 - Input HDMI 1 & 2
-  - Intended for the remote entity in addition to the source select feature of the media player entity
+  - Intended for the remote entity in addition to the source select feature of the media player entity and the input select entity
 - Calibration Presets*
   - Cinema Film 1, Cinema Film 2, Reference, TV, Photo, Game, Bright Cinema, Bright TV, User, User1-3\***
 - Aspect Ratios* ***
-  - Normal, Squeeze, Stretch**, V Stretch, Zoom 1:85, Zoom 2:35
+  - Normal, Squeeze, Stretch**, V Stretch, Zoom 1:85, Zoom 2:35, Aspect Ratio Scaling\*\*\*
 - Picture Positions (Select and Save)***
   - 1,85, & 2,35***
   - Custom 1-3
@@ -224,8 +222,8 @@ Please note that when running this integration on the remote the power/mute/inpu
   - Lens Shift Up/Down/Left/Right
   - Lens Focus Far/Near
   - Lens Zoom Large/Small
-- Update Health & Video signal info
-  - This can be used in macros or command sequences together with commands of your media playback devices where the video signal may get changed or updated (e.g. play, pause, enter/select)
+- Update all sensors, health sensors, video signal sensors
+  - These commands can be used in macros or command sequences, for example together with commands of your media playback devices where the video signal may get changed or updated (e.g. play, pause, enter/select)
 
 \* _Only works if a video signal is present at the input_ \
 \** _May not work work with all video signals. Please refer to Sony's user manual_ \
@@ -243,7 +241,7 @@ If a command can't be processed or applied by the projector this will result in 
   - Simple command names have to be in upper case and separated by a comma
   - Sending raw ADCP commands is supported
 
-You can also send native ADCP commands with the send command and send command sequence commands. This is useful for commands that are not available as simple commands or need a specific value. Please refer to the [ADCP supported commands list](#adcp-supported-commands-list) for a list of all commands for your projector model.
+You can also send native ADCP commands with the send command and send command sequence commands. This is useful for commands that are not available as simple commands or support setting it to a specific numeric value like iris/laser brightness. Please refer to the [ADCP supported commands list](#adcp-supported-commands-list) for a list of all commands for your projector model.
 
 ### Default remote entity button mappings
 

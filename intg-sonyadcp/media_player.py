@@ -44,6 +44,7 @@ async def remove(device_id: str):
 
 
 
+
 async def cmd_handler(entity: ucapi.MediaPlayer, cmd_id: str, _params: dict[str, Any] | None) -> ucapi.StatusCodes:
     """
     Media Player command handler.
@@ -55,6 +56,15 @@ async def cmd_handler(entity: ucapi.MediaPlayer, cmd_id: str, _params: dict[str,
     :param _params: optional command parameters
     :return: status of the command
     """
+
+    device_id = entity.id
+
+    async def update_cmd_attributes(device_id: str, cmd_id: str):
+        try:
+            await projector.update_attributes(device_id, cmd_id)
+        except Exception as e:
+            #No exception as this is not a critical error. The command itself was sent successfully. Not all query commands are supported by all projector models
+            _LOG.error(f"Failed to update entity attributes for device {device_id} after command {cmd_id}: {e}")
 
     try:
         if not _params:
@@ -76,6 +86,9 @@ async def cmd_handler(entity: ucapi.MediaPlayer, cmd_id: str, _params: dict[str,
         if error:
             _LOG.error(f"Failed to send command {cmd_id}: {error}")
         return ucapi.StatusCodes.BAD_REQUEST
+
+    #Update attributes in async task to not interfere with command timeout
+    driver.asyncio.create_task(update_cmd_attributes(device_id, cmd_id))
     return ucapi.StatusCodes.OK
 
 
@@ -150,7 +163,8 @@ async def mp_poller(device_id: str, interval: int) -> None:
         if config.Setup.get(config.Setup.Keys.STANDBY):
             continue
         try:
-            #TODO Implement check if there are too many timeouts/connection errors to the projector and automatically deactivate poller and set entity status to unknown
+            #TODO Implement check if there are too many timeouts/connection errors to the projector and \
+            # automatically stop and disable poller and set entity state attribute to unknown
             await update_attributes(device_id)
         except Exception as e:
             _LOG.error(e)
@@ -168,7 +182,7 @@ async def update_attributes(device_id: str):
     _LOG.debug(f"Checking power/mute/input status for media player attributes for {device_id}")
     try:
         try:
-            power = await projector.get_setting(device_id, config.SensorTypes.POWER_STATUS)
+            power = await projector.get_setting(device_id, config.SensorTypes.POWER_STATUS, standby=True)
         except Exception as e:
             _LOG.error(e)
             _LOG.error(f"Can't get power state from projector. Set state to {ucapi.media_player.States.UNKNOWN}")

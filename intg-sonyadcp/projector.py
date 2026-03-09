@@ -45,7 +45,7 @@ def projector_def(device_id:str = None):
 
 
 
-async def get_setting(device_id: str, setting: str):
+async def get_setting(device_id: str, setting: str, standby: bool = False):
     """Get the current adcp value of a specific setting from the projector and return it as a string without quotes that adcp normally includes.
     Some values get converted to match a valid entity state like power_status or get loaded from a json like light, temperature, warning and error messages
     """
@@ -77,9 +77,13 @@ async def get_setting(device_id: str, setting: str):
         raise
 
     #Needed as config.SensorTypes.POWER_STATUS also reports interstates like standby that can't be used as a adcp select value
+    # Return ucapi.media_player.States.STANDBY if standby=True which is used for media_player.update_attributes()
     if setting == config.SensorTypes.POWER_STATUS \
         and setting_value in (ADCP.Responses.States.COOLING1, ADCP.Responses.States.COOLING2, ADCP.Responses.States.STANDBY):
-        setting_value = ADCP.Responses.States.OFF
+        if standby:
+            setting_value = ucapi.media_player.States.STANDBY
+        else:
+            setting_value = ADCP.Responses.States.OFF
     if setting == config.SensorTypes.POWER_STATUS and setting_value in (ADCP.Responses.States.STARTUP):
         setting_value = ADCP.Responses.States.ON
 
@@ -223,6 +227,23 @@ async def send_cmd(device_id: str, cmd_name: str | dict, params = None):
             except KeyError as k:
                 if not any(cmd_name == item for item in ucapi.media_player.Commands):
                     _LOG.info(f"Could't find a matching entity or simple command. \"{cmd_name}\" could be a native ADCP command. Skipping conversion")
+                    quote_linting = str.maketrans({
+                        "‘": '"',  # left single quotation mark
+                        "’": '"',  # right single quotation mark
+                        "‚": '"',  # single low-9 quotation mark
+                        "‛": '"',  # single high-reversed-9 quotation mark
+                        "“": '"',  # left double quotation mark
+                        "”": '"',  # right double quotation mark
+                        "„": '"',  # double low-9 quotation mark
+                        "‟": '"',  # double high-reversed-9 quotation mark
+                        "‹": '"',  # single guillemet
+                        "›": '"',
+                        "«": '"',  # double guillemet
+                        "»": '"',
+                        "`": '"',
+                        "´": '"'
+                    })
+                    cmd_name.translate(quote_linting)
                     try:
                         await projector_adcp.command(cmd_name)
                     except Exception:
@@ -239,12 +260,6 @@ async def send_cmd(device_id: str, cmd_name: str | dict, params = None):
                     await projector_adcp.command(adcp_cmd)
                 except Exception:
                     raise
-
-    try:
-        await update_attributes(device_id, cmd_name)
-    except Exception as e:
-        #No exception as this is not a critical error. The command itself was sent successfully. Not all query commands are supported by all projector models
-        _LOG.error(f"Failed to update entity attributes for device {device_id} after command {cmd_name}: {e}")
 
 
 
@@ -294,6 +309,7 @@ async def update_attributes(device_id:str , cmd_name:str|dict):
         match cmd_name:
 
             case ucapi.media_player.Commands.ON:
+
                 await driver.asyncio.sleep(3)  # Wait 3 seconds for the projector to report the correct power state
                 try:
                     await media_player.update_attributes(device_id)
@@ -304,6 +320,7 @@ async def update_attributes(device_id:str , cmd_name:str|dict):
                     raise
 
             case ucapi.media_player.Commands.OFF:
+
                 await driver.asyncio.sleep(3)  # Wait 3 seconds for the projector to report the correct power state
                 try:
                     await media_player.update_attributes(device_id)
@@ -396,7 +413,7 @@ async def update_attributes(device_id:str , cmd_name:str|dict):
             case _ if cmd_name.startswith("IRIS_BRIGHTNESS"):
                 setting_name = config.SensorTypes.IRIS_BRIGHTNESS
             case _:
-                _LOG.debug(f"Command {cmd_name} has no associated setting sensor or select entity to update")
+                _LOG.debug(f"Command \"{cmd_name}\" has no associated entity attributes, sensors or select entities to update")
                 return
 
         if setting_name != "":

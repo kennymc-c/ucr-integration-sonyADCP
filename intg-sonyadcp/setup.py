@@ -3,8 +3,8 @@
 """Module that includes all functions needed for the setup and reconfiguration process"""
 
 import logging
+import json
 
-from ipaddress import ip_address
 import socket
 import ucapi
 
@@ -178,6 +178,7 @@ async def show_setup_basic(device_id = None) -> ucapi.SetupAction:
     :param msg: value(s) of input fields in the first setup screen.
     :return: the setup action on how to continue
     """
+    ip_regex = config.Setup.get(config.Setup.Keys.IP_REGEX)
 
     if device_id is None:
         _LOG.info("Starting basic setup for a new device")
@@ -224,7 +225,8 @@ async def show_setup_basic(device_id = None) -> ucapi.SetupAction:
                             "de": "Projektor-IP (leer lassen zur automatischen Erkennung):"
                             },
                     "field": {"text": {
-                                    "value": ip
+                                    "value": ip,
+                                    "regex": ip_regex
                                     }
                             }
                 },
@@ -280,14 +282,7 @@ async def handle_response_basic(msg: ucapi.UserDataResponse) -> ucapi.SetupActio
     advanced_settings = msg.input_values["advanced_settings"]
 
     if ip != "":
-        #TODO Add regex check for ip address directly in json schema like described in the asyncapi documentation
-        # https://studio.asyncapi.com/?url=https://raw.githubusercontent.com/unfoldedcircle/core-api/main/integration-api/UCR-integration-asyncapi.yaml#schema-SettingTypeText
         _LOG.info("Entered ip address: " + ip)
-        try:
-            ip_address(ip)
-        except ValueError:
-            _LOG.error("The entered ip address \"" + ip + "\" is not valid")
-            return ucapi.SetupError(error_type=ucapi.IntegrationSetupError.NOT_FOUND)
     else:
         _LOG.info("No ip address entered. Using auto discovery mode")
         config.Setup.set(config.Setup.Keys.SETUP_AUTO_DISCOVERY, True)
@@ -336,6 +331,7 @@ async def show_setup_advanced():
             adcp_port = config.Devices.get(device_id, config.DevicesKeys.ADCP_PORT)
             adcp_timeout = config.Devices.get(device_id, config.DevicesKeys.ADCP_TIMEOUT)
             sdap_port = config.Devices.get(device_id, config.DevicesKeys.SDAP_PORT)
+            picture_positions_mapping = config.Devices.get(device_id, config.DevicesKeys.PICTURE_POSITIONS_MAPPING)
             mp_poller_interval = config.Devices.get(device_id, config.DevicesKeys.MP_POLLER_INTERVAL)
             health_poller_interval = config.Devices.get(device_id, config.DevicesKeys.HEALTH_POLLER_INTERVAL)
             config.Setup.set(config.Setup.Keys.SETUP_STEP, config.SetupSteps.advanced_reconfigure)
@@ -343,6 +339,7 @@ async def show_setup_advanced():
             adcp_port = config.Setup.get(config.Setup.Keys.DEFAULT_ADCP_PORT)
             adcp_timeout = config.Setup.get(config.Setup.Keys.DEFAULT_ADCP_TIMEOUT)
             sdap_port = config.Setup.get(config.Setup.Keys.DEFAULT_SDAP_PORT)
+            picture_positions_mapping = config.Setup.get(config.Setup.Keys.DEFAULT_PICTURE_POSITIONS_MAPPING)
             mp_poller_interval = config.Setup.get(config.Setup.Keys.DEFAULT_POLLER_INTERVAL_MEDIA_PLAYER)
             health_poller_interval = config.Setup.get(config.Setup.Keys.DEFAULT_POLLER_INTERVAL_HEALTH)
             config.Setup.set(config.Setup.Keys.SETUP_STEP, config.SetupSteps.advanced)
@@ -352,10 +349,12 @@ async def show_setup_advanced():
     adcp_port = adcp_port if adcp_port is not None else config.Setup.get(config.Setup.Keys.DEFAULT_ADCP_PORT)
     adcp_timeout = adcp_timeout if adcp_timeout is not None else config.Setup.get(config.Setup.Keys.DEFAULT_ADCP_TIMEOUT)
     sdap_port = sdap_port if sdap_port is not None else config.Setup.get(config.Setup.Keys.DEFAULT_SDAP_PORT)
+    picture_positions_mapping = picture_positions_mapping if picture_positions_mapping is not None else config.Setup.get(config.Setup.Keys.DEFAULT_PICTURE_POSITIONS_MAPPING)
     mp_poller_interval = mp_poller_interval if mp_poller_interval is not None else config.Setup.get(config.Setup.Keys.DEFAULT_POLLER_INTERVAL_MEDIA_PLAYER)
     health_poller_interval = health_poller_interval if health_poller_interval is not None else config.Setup.get(config.Setup.Keys.DEFAULT_POLLER_INTERVAL_HEALTH)
 
-    #TODO Report bug to UC that \n\n in field text is causing an ui formatting error in the web configurator (wrong font and alignment offset too far to the right)
+    picture_positions_mapping = json.loads(picture_positions_mapping)
+
     return ucapi.RequestUserInput(
         {
             "en": "Advanced Settings",
@@ -377,8 +376,8 @@ async def show_setup_advanced():
             {
                 "id": "adcp_timeout",
                 "label": {
-                        "en": "ADCP timeout:",
-                        "de": "ADCP-Timeout:"
+                        "en": "ADCP timeout (in seconds):",
+                        "de": "ADCP-Timeout (in Sekunden):"
                         },
                 "field": {"number": {
                                 "value": adcp_timeout,
@@ -399,19 +398,81 @@ async def show_setup_advanced():
                         }
             },
             {
-                "id": "note",
+                "id": "note_mapping",
+                "label": {"en": "Custom Picture Presets display names", "de": "Anzeigenamen für Benutzer-Bildpositionen"},
+                "field": { "label": { "value": {
+                    "en":"Here you can define your own display names for the up to 5 custom picture position presets for sensor and select entities, \
+                        for example to assign them to the aspect ratio set with them. Custom 4 and 5 are only available on certain models. \
+                        Leave the corresponding field empty so that the default display name is used.",
+                    "de":"Hier kannst du eigene Anzeigenamen für die bis zu 5 Benutzer-Bildpositionseinstellungen für Sensor- und Auswahl-Entitäten definieren, \
+                        um sie z.B. dem damit eingestelltem Seitenverhältnis zuzuordnen. Custom 4 und 5 sind nur auf bestimmten Modellen verfügbar. \
+                        Lass das jeweilige Feld leer, damit der Standardname verwendet wird."
+                    } }
+                }
+            },
+            {
+                "id": "picture_positions_mapping_1",
+                "label": {
+                        "en": "Custom 1"
+                        },
+                "field": {"text": {
+                                "value": picture_positions_mapping["custom1"]
+                                }
+                        }
+            },
+            {
+                "id": "picture_positions_mapping_2",
+                "label": {
+                        "en": "Custom 2"
+                        },
+                "field": {"text": {
+                                "value": picture_positions_mapping["custom2"]
+                                }
+                        }
+            },
+            {
+                "id": "picture_positions_mapping_3",
+                "label": {
+                        "en": "Custom 3"
+                        },
+                "field": {"text": {
+                                "value": picture_positions_mapping["custom2"]
+                                }
+                        }
+            },
+            {
+                "id": "picture_positions_mapping_4",
+                "label": {
+                        "en": "Custom 4"
+                        },
+                "field": {"text": {
+                                "value": picture_positions_mapping["custom4"]
+                                }
+                        }
+            },
+            {
+                "id": "picture_positions_mapping_5",
+                "label": {
+                        "en": "Custom 5"
+                        },
+                "field": {"text": {
+                                "value": picture_positions_mapping["custom5"]
+                                }
+                        }
+            },
+            {
+                "id": "note_poller",
                 "label": {"en": "Poller intervals", "de": "Poller-Intervalle"},
                 "field": { "label": { "value": {
                     "en":
                         "When running this integration as a custom integration on the remote itself it is best not to change these intervals or \
-                        set them as high as possible to reduce battery consumption and save cpu/memory usage. \
-                        An interval set to high can lead to unstable system performance. \
-                        Values are in seconds. Use 0 to deactivate the task.",
+                        set them as high as possible to reduce battery consumption and save cpu/memory usage. An interval set to low can \
+                        lead to unstable system performance. \n\nValues are in seconds. Use 0 to deactivate the task.",
                     "de":
                         "Wenn du diese Integration als Custom Integration auf der Remote selbst laufen lässt, ändere diese Intervalle am Besten nicht oder \
-                        setze sie möglichst hoch, um den Batterieverbrauch zu reduzieren und die CPU-/Arbeitsspeichernutzung zu verringern. \
-                        Ein zu hoher Intervall kann zu einem instabilen System führen. \
-                        Die Werte werden in Sekunden angegeben. Verwende 0, um den Prozess zu deaktivieren."
+                        setze sie möglichst hoch, um den Batterieverbrauch zu reduzieren und die CPU-/Arbeitsspeichernutzung zu verringern. Ein zu \
+                        niedriger Intervall kann zu einem instabilen System führen. \n\nDie Werte werden in Sekunden angegeben. \
+                        Verwende 0, um den Prozess zu deaktivieren."
                     } }
                 }
             },
@@ -459,7 +520,24 @@ async def handle_response_advanced(msg: ucapi.UserDataResponse) -> ucapi.SetupAc
     mp_poller_interval = int(msg.input_values["mp_poller_interval"])
     health_poller_interval = int(msg.input_values["health_poller_interval"])
 
+    picture_positions_mapping = {}
+    picture_positions_names = \
+        [msg.input_values["picture_positions_mapping_1"], \
+        msg.input_values["picture_positions_mapping_2"], \
+        msg.input_values["picture_positions_mapping_3"], \
+        msg.input_values["picture_positions_mapping_4"], \
+        msg.input_values["picture_positions_mapping_5"]]
+
+    if not all(v == "" for v in picture_positions_names):
+        for picture_preset_name in picture_positions_names:
+            if picture_preset_name != "":
+                picture_positions_mapping.update({f"custom{picture_positions_names.index(picture_preset_name)+1}": picture_preset_name})
+
     skip_entities = False
+
+    if not isinstance(picture_positions_mapping, dict):
+        _LOG.error("Entered picture presets mapping is not a valid Python dictionary. Please check the example")
+        return ucapi.SetupError()
 
     if config.Setup.get(config.Setup.Keys.SETUP_STEP) == config.SetupSteps.advanced_reconfigure:
         if config.Devices.get(device_id, config.DevicesKeys.ADCP_PORT) is None and config.Devices.get(device_id, config.DevicesKeys.SDAP_PORT) is None:
@@ -467,7 +545,7 @@ async def handle_response_advanced(msg: ucapi.UserDataResponse) -> ucapi.SetupAc
         else:
             if ip == config.Devices.get(device_id, config.DevicesKeys.IP) and adcp_port == config.Devices.get(device_id, config.DevicesKeys.ADCP_PORT) \
             and sdap_port == config.Devices.get(device_id, config.DevicesKeys.SDAP_PORT):
-                _LOG.info("No entity validation related values have been changed. Skipping entity validation and creation")
+                _LOG.info("No entity validation or definition related values have been changed. Skipping entity validation and creation")
                 skip_entities = True
 
     try:
@@ -494,6 +572,14 @@ async def handle_response_advanced(msg: ucapi.UserDataResponse) -> ucapi.SetupAc
             if config.Devices.get(device_id=device_id, key=config.DevicesKeys.ADCP_TIMEOUT) is not None:
                 _LOG.debug("ADCP timeout has been changed back to default value. Removing from config")
                 config.Devices.remove(device_id=device_id, key=config.DevicesKeys.ADCP_TIMEOUT)
+
+        if picture_positions_mapping != json.loads(config.Setup.get(config.Setup.Keys.DEFAULT_PICTURE_POSITIONS_MAPPING))\
+            and not all(v == "" for v in picture_positions_names):
+            config.Devices.add(device_id=device_id, entity_data={config.DevicesKeys.PICTURE_POSITIONS_MAPPING: picture_positions_mapping})
+        else:
+            if config.Devices.get(device_id=device_id, key=config.DevicesKeys.PICTURE_POSITIONS_MAPPING) is not None:
+                _LOG.debug("Picture presets mapping have been changed back to default values or are all empty values. Removing from config")
+                config.Devices.remove(device_id=device_id, key=config.DevicesKeys.PICTURE_POSITIONS_MAPPING)
 
         if mp_poller_interval != config.Setup.get(config.Setup.Keys.DEFAULT_POLLER_INTERVAL_MEDIA_PLAYER):
             config.Devices.add(device_id=device_id, entity_data={config.DevicesKeys.MP_POLLER_INTERVAL: mp_poller_interval})
@@ -668,6 +754,11 @@ async def validate_entity_data(model:str = None, serial:str = None):
     _LOG.info("Sending ADCP test command")
     try:
         await projector.get_setting(device_id, config.SensorTypes.LIGHT_TIMER)
+    except OSError as e:
+        _LOG.critical(e)
+        _LOG.info("This usually happens when the hostname of the device running the integration has changed which is used to decrypt the password")
+        _LOG.info("Please either use the old hostname or configure the device again and enter the passwort to decrypt it using the new hostname")
+        raise
     except Exception as e:
         error = str(e)
         if error:

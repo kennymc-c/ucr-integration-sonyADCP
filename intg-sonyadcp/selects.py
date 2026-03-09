@@ -91,6 +91,9 @@ async def update_attributes(device_id: str, select_type: str):
 
     select_id = config.Devices.get(device_id=device_id, key=f"select-{select_type}-id")
 
+    if not select_id:
+        raise ValueError(f"No select entity found for select type \"{select_type}\"")
+
     _LOG.debug(f"Updating attributes for select entity {select_id}")
 
     options_prettified = None
@@ -116,8 +119,8 @@ Either because the projector is powered off or the current signal doesn't suppor
         _LOG.error(f"Error while retrieving options for select entity {select_id}. Options will not be updated")
         return
     else:
-        options_prettified = config.convert_options(options)
-        current_option_prettified = config.convert_options(current_option)
+        options_prettified = config.convert_options(options, device_id)
+        current_option_prettified = config.convert_options(current_option, device_id)
         attributes = {
                 ucapi.select.Attributes.STATE: ucapi.select.States.ON,
                 ucapi.select.Attributes.OPTIONS: options_prettified,
@@ -203,8 +206,9 @@ async def cmd_handler(entity: ucapi.Select, cmd_id: str, params: dict[str, Any] 
                 cycle = False
                 _LOG.warning("Cycle parameter is enabled for this command but it is currently ignored")
         except KeyError:
-            pass #BUG Cycle parameter currently not included in web configurator or commands
+            pass #BUG #WAIT Cycle parameter currently not included in web configurator or commands
         #although it's not labeled as a planned feature in the core-api docs
+        #Asked on Discord: https://discord.com/channels/553671366411288576/970313654190887011/1477021799865782304
 
     match cmd_id:
 
@@ -270,7 +274,7 @@ async def cmd_handler(entity: ucapi.Select, cmd_id: str, params: dict[str, Any] 
         return ucapi.StatusCodes.BAD_REQUEST
 
     command_adcp = config.UC2ADCP.get(setting)
-    value_adcp = config.convert_options(option, reverse=True)
+    value_adcp = config.convert_options(option, device_id=device_id, reverse=True)
 
     if setting == config.SelectTypes.PICTURE_POSITION_SAVE:
         #pic_pos_save and del commands need different values than pic_pos_sel that is used to get the options
@@ -278,6 +282,13 @@ async def cmd_handler(entity: ucapi.Select, cmd_id: str, params: dict[str, Any] 
         value_adcp = f"--{value_adcp}"
 
     command = {"command": command_adcp, "value": value_adcp, "setting": setting}
+
+    async def update_cmd_attributes(device_id: str, command: dict):
+        try:
+            await projector.update_attributes(device_id, command)
+        except Exception as e:
+            #No exception as this is not a critical error. The command itself was sent successfully. Not all query commands are supported by all projector models
+            _LOG.error(f"Failed to update entity attributes for device {device_id} after command {str(command)}: {e}")
 
     try:
         if option is not None:
@@ -299,4 +310,7 @@ async def cmd_handler(entity: ucapi.Select, cmd_id: str, params: dict[str, Any] 
         if error:
             _LOG.error(f"Failed to send command {cmd_id}: {error}")
         return ucapi.StatusCodes.BAD_REQUEST
+
+    #Update attributes in async task to not interfere with command timeout
+    driver.asyncio.create_task(update_cmd_attributes(device_id, command))
     return ucapi.StatusCodes.OK

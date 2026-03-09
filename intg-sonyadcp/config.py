@@ -38,11 +38,13 @@ class SetupData:
     standby: bool = False
     bundle_mode: bool = False
     cfg_path: str = "config.json"
+    ip_regex: str = r"^((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3})$|^(([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}|(([0-9a-fA-F]{1,4}:){1,7}:)|(([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4})|(([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2})|(([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3})|(([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4})|(([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5})|([0-9a-fA-F]{1,4}:)((:[0-9a-fA-F]{1,4}){1,6})|(:)((:[0-9a-fA-F]{1,4}){1,7}|:))$"
     default_adcp_port: int = 53595
     default_adcp_timeout: int = 5
     default_sdap_port: int = 53862
     default_poller_interval_media_player: int = 20
     default_poller_interval_health: int = 1800
+    default_picture_positions_mapping: str = "{\"custom1\":\"\",\"custom2\":\"\",\"Custom 3\":\"\",\"custom4\":\"\",\"custom5\":\"\"}"
     setup_complete: bool = False
     setup_reconfigure: bool = False
     setup_auto_discovery: bool  = False
@@ -52,10 +54,11 @@ class SetupData:
     setup_temp_device_name: str = "temp-device"
 
 class Messages(StrEnum):
-    #TODO Create different language specific message classes that will be used depending on what language the remote is set to (via ucapi call api.get_localization_cfg)
+    #TODO #WAIT Create different language specific message classes that will be used depending on what language the remote is set to
+    # when ucapi is updated (via ucapi call api.get_localization_cfg)
     """Defines all messages used as values in the integration"""
     TEMPORARILY_UNAVAILABLE = "Temporarily Unavailable"
-    ERROR = "Error"
+    ERROR = "Polling Error"
     NO_SIGNAL = "No Signal"
     VIDEO_MUTED = "Video Muted"
     NO_ERROR = "No Error"
@@ -91,6 +94,7 @@ class SimpleCommands (StrEnum):
     MODE_ASPECT_RATIO_V_STRETCH =                               "MODE_AR_V_STRETCH"
     MODE_ASPECT_RATIO_SQUEEZE =                                 "MODE_AR_SQUEEZE"
     MODE_ASPECT_RATIO_STRETCH =                                 "MODE_AR_STRETCH"
+    MODE_ASPECT_RATIO_ASPECT_RATIO_SCALING =                    "MODE_AR_RATIO_SCALE"
     MODE_MOTIONFLOW_OFF =                                       "MODE_MOTION_OFF"
     MODE_MOTIONFLOW_SMOOTH_HIGH =                               "MODE_MOTION_SMTH_HIGH"
     MODE_MOTIONFLOW_SMOOTH_LOW =                                "MODE_MOTION_SMTH_LOW"
@@ -294,6 +298,7 @@ class UC2ADCP:
         SimpleCommands.MODE_ASPECT_RATIO_ZOOM_2_35: f"{ADCP.Commands.Select.ASPECT} {ADCP.Values.Aspect.ZOOM_2_35}",
         SimpleCommands.MODE_ASPECT_RATIO_STRETCH: f"{ADCP.Commands.Select.ASPECT} {ADCP.Values.Aspect.STRETCH}",
         SimpleCommands.MODE_ASPECT_RATIO_SQUEEZE: f"{ADCP.Commands.Select.ASPECT} {ADCP.Values.Aspect.SQUEEZE}",
+        SimpleCommands.MODE_ASPECT_RATIO_ASPECT_RATIO_SCALING: f"{ADCP.Commands.Select.ASPECT} {ADCP.Values.Aspect.ASPECT_RATIO_SCALING}",
         SimpleCommands.MODE_MOTIONFLOW_OFF: f"{ADCP.Commands.Select.MOTIONFLOW} {ADCP.Values.Motionflow.OFF}",
         SimpleCommands.MODE_MOTIONFLOW_COMBINATION: f"{ADCP.Commands.Select.MOTIONFLOW} {ADCP.Values.Motionflow.COMBINATION}",
         SimpleCommands.MODE_MOTIONFLOW_SMOOTH_HIGH: f"{ADCP.Commands.Select.MOTIONFLOW} {ADCP.Values.Motionflow.SMOOTH_HIGH}",
@@ -561,11 +566,13 @@ class Setup:
         STANDBY = "standby"
         BUNDLE_MODE = "bundle_mode"
         CFG_PATH = "cfg_path"
+        IP_REGEX = "ip_regex"
         DEFAULT_POLLER_INTERVAL_MEDIA_PLAYER = "default_poller_interval_media_player"
         DEFAULT_POLLER_INTERVAL_HEALTH = "default_poller_interval_health"
         DEFAULT_ADCP_PORT = "default_adcp_port"
         DEFAULT_ADCP_TIMEOUT = "default_adcp_timeout"
         DEFAULT_SDAP_PORT = "default_sdap_port"
+        DEFAULT_PICTURE_POSITIONS_MAPPING = "default_picture_positions_mapping"
         SETUP_COMPLETE = "setup_complete"
         SETUP_RECONFIGURE = "setup_reconfigure"
         SETUP_STEP = "setup_step"
@@ -703,7 +710,7 @@ class Devices:
         SDAP_PORT = "sdap_port"
         MP_POLLER_INTERVAL = "mp_poller_interval"
         HEALTH_POLLER_INTERVAL = "health_poller_interval"
-
+        PICTURE_POSITIONS_MAPPING = "picture_positions_mapping"
 
     @staticmethod
     def get(device_id: str = None, key: str = None):
@@ -813,7 +820,7 @@ class Devices:
         """
         Remove a device or a specific key from a device by its media player/remote entity ID.
         Saves changes to the config file.
-        :param device_id: The entity ID of the device's media player/remote entity.
+        :param device_id: The device_id of the device
         :param key: (Optional) The specific key to remove from the device's data.
         """
 
@@ -1097,18 +1104,26 @@ _SPECIAL_CASES = {
 
 _REVERSE_SPECIAL_CASES = {v: k for k, v in _SPECIAL_CASES.items()}
 
-def convert_options(option: str | list[str], reverse: bool = False) -> str | list[str]:
+def convert_options(option: str | list[str], device_id: str = None, reverse: bool = False) -> str | list[str]:
     """Prettify or reconvert sensor value attributes and select option attributes back to raw ADCP command values. Works with single strings and lists"""
 
+    picture_positions_mapping = {}
+    if device_id:
+        picture_positions_mapping = Devices.get(device_id, DevicesKeys.PICTURE_POSITIONS_MAPPING)
+
     if isinstance(option, list):
-        return [convert_options(item, reverse=reverse) for item in option]
+        return [convert_options(item, reverse=reverse, device_id=device_id) for item in option]
 
     if not reverse:
-        #ADCP values -> Select options/sensor values
+        if picture_positions_mapping:
+            if option in picture_positions_mapping:
+                if picture_positions_mapping[option] is not "":
+                    return picture_positions_mapping[option]
+
         if option in _SPECIAL_CASES:
             return _SPECIAL_CASES[option]
 
-        # Then check for partial matches and replace them
+        #Check for partial matches and replace them
         result = option
         for key, value in _SPECIAL_CASES.items():
             result = result.replace(key, value)
@@ -1137,9 +1152,13 @@ def convert_options(option: str | list[str], reverse: bool = False) -> str | lis
 
         return result
 
-    # Select/sensor options -> ADCP values
+    reverse_picture_positions_mapping = {v: k for k, v in picture_positions_mapping.items()}
+    if option in reverse_picture_positions_mapping:
+        return f"\"{reverse_picture_positions_mapping[option]}\""
+
     if option in _REVERSE_SPECIAL_CASES:
-        return f"\"{_REVERSE_SPECIAL_CASES[option]}\""
+        if picture_positions_mapping[option] is not "":
+            return f"\"{_REVERSE_SPECIAL_CASES[option]}\""
 
     raw = option.lower().replace(" ", "_").replace("bright", "brt").replace("bt", "bt.").replace("HDMI ", "hdmi")
 
