@@ -347,6 +347,7 @@ async def main():
         _LOG.info("Disabling power/mute/input and health poller task to reduce battery consumption when running on the remote")
         _LOG.info("The pollers can still be enabled afterwards if a custom interval has been set in the manual advanced setup")
         config.Setup.set(config.Setup.Keys.DEFAULT_POLLER_INTERVAL_MEDIA_PLAYER, 0, False) #Using False to prevent the config file from being created before first time setup
+        config.Setup.set(config.Setup.Keys.DEFAULT_POLLER_INTERVAL_HEALTH, 0, False) #Using False to prevent the config file from being created before first time setup
 
     try:
         config.Setup.load()

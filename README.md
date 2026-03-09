@@ -274,7 +274,7 @@ By default the integration checks the status of all media player entity attribut
 
 #### Health status poller
 
-All health sensor data (light source timer, temperature and error/warning) will be updated every time the projector is powered on or off by the remote and automatically **every 30 minutes by default while the projector is powered on** and the remote is not in sleep/standby mode or the integration is disconnected. The interval can be changed in the advanced settings.
+All health sensor data (light source timer, temperature and error/warning) will be updated every time the projector is powered on or off by the remote and automatically **every 30 minutes by default while the projector is powered on** and the remote is not in sleep/standby mode or the integration is disconnected. The interval can be changed in the advanced settings. Set it to 0 to deactivate this function. **When running on the remote as a custom integration the interval will be automatically disabled (set to 0) to reduce battery consumption and save cpu/memory usage.**
 
 ## Installation
 

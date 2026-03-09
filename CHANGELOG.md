@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - The media player entity is now using the standby state if the projector reports it which is usually when it gets powered off
   - The remote entity is still using on and off as states as these entity types don't support the standby state
+- Setting default health status poller interval to 0 if running on the remote
 - Moved ip address format validation from internal logic to integration api regex validation
 - When sending raw ADCP commands through the remote entity all quotes are now automatically converted to correct straight double quotes (") that are accepted by the adcp protocol
 
