@@ -1,6 +1,6 @@
 {
     "driver_id": "sonyadcp",
-    "version": "1.6.1",
+    "version": "1.6.3",
     "release_date": "2026-06-12",
     "min_core_api": "0.25.0",
     "name": { 
