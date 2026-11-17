@@ -31,7 +31,6 @@ Using [uc-integration-api](https://github.com/aitatoi/integration-python-library
 - [Installation](#installation)
   - [Run on the remote as a custom integration driver](#run-on-the-remote-as-a-custom-integration-driver)
     - [Limitations / Disclaimer](#limitations--disclaimer)
-      - [Missing firmware features](#missing-firmware-features)
     - [1 - Download integration driver](#1---download-integration-driver)
     - [2 - Upload \& installation](#2---upload--installation)
       - [Upload in Web Configurator](#upload-in-web-configurator)
@@ -290,10 +289,6 @@ All health sensor data (light source timer, temperature and error/warning) will 
 #### Limitations / Disclaimer
 
 _⚠️ This requires firmware version 1.9.2 or newer and 2.8.3 to support select entities. Installing firmware versions above 1.7.14 for Remote Two currently need beta updates to be enabled._
-
-##### Missing firmware features
-
-- The configuration file of custom integrations are not included in backups.
 
 #### 1 - Download integration driver
 
